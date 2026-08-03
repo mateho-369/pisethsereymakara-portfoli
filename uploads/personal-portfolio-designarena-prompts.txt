@@ -1,0 +1,128 @@
+# Personal Media Portfolio & Gallery — Design Brief + DesignArena AI Prompt Pack
+
+## 1. សង្ខេបគម្រោង (Stack ថ្មីដែលបានសម្រេច)
+
+| ផ្នែក | បច្ចេកវិទ្យា |
+|---|---|
+| Frontend | **React** → deploy លើ **Cloudflare Pages** |
+| Backend | **Laravel** → រត់លើ GCP **e2-micro** VM (ក្នុង Docker) |
+| Object Storage | **MinIO** (self-hosted លើ VM ដដែល) |
+| Database | **PostgreSQL** managed free tier (**Supabase** / **Neon.tech**) — សន្សំ RAM លើ VM |
+| Auth | **Laravel Sanctum** — role `admin` (អ្នក) និង `visitor` (អ្នកចូលមើល signup/login ដើម្បី chat) |
+| Realtime chat | **Laravel Reverb** (WebSocket server ឥតគិតថ្លៃ built-in នៅក្នុង Laravel) proxy តាម Cloudflare Proxied DNS (Free plan គាំទ្រ WebSocket) |
+| Design workflow | Mockup ជាមុនក្នុង **DesignArena AI** → export → **GitHub** → បន្តសរសេរកូដ |
+
+## 2. Design Direction — "Hopecore Peace" (Thorfinn's no-enemies era)
+
+Vibe "hopecore + peace + Vinland Saga's Thorfinn ដែលលែងមានសត្រូវ" ខ្ញុំបានបំប្លែងទៅជា design tokens ជាក់លាក់ខាងក្រោម ដើម្បីឲ្យ DesignArena AI generate រូបភាពស៊ីគ្នារវាងទំព័រនីមួយៗ (ព្រោះវា generate ដាច់ដោយឡែកម្តងមួយៗ)។
+
+**Color**
+
+| តួនាទី | ឈ្មោះ | Hex |
+|---|---|---|
+| Background | Fjord Mist | `#EEF2EA` |
+| Surface / Card | Birch Cream | `#F8F4E9` |
+| Text / Ink | Peat Ink | `#2B3328` |
+| Accent — Hope | Wheat Gold | `#D9A441` |
+| Accent — Peace | Fjord Blue | `#5C7A89` |
+| Accent — Earth | Moss | `#6E7C52` |
+
+គ្មានខ្មៅសុទ្ធ គ្មាន neon គ្មាន dark cyberpunk — គោលដៅ "ព្រឹកព្រលឹមស្ងប់លើវាល" មិនមែន "gaming site" ទេ។
+
+**Typography** — Display: `Fraunces` (serif ស្រទន់កក់ក្តៅ) · Body: `Inter` (sans អានស្រួល) · Metadata/timestamp: `JetBrains Mono` តូច tracked
+
+**Signature** — "The Rising Horizon": បន្ទាត់ gradient ស្តើង (moss → gold → fjord blue) ប្រើដដែលៗជា section divider, scroll-progress bar, និង underline ក្រោម nav/tab active — និមិត្តរូបតែមួយ ភ្ជាប់ "សង្ឃឹម" (ថ្ងៃរះ) និង "សន្តិភាព" (ជើងមេឃស្ងប់) ចូលគ្នា
+
+**Motion** — ស្ងប់ស្ងាត់ មិនលោត: fade + rise ~10px ពេល scroll, hover លើ card = លើកឡើង 2px + glow មាសស្រទន់, គ្មាន bounce គ្មាន confetti គ្មាន autoplay carousel
+
+## 3. ទំព័រដែលត្រូវ mockup (4 ទំព័រ)
+
+1. **Landing / Homepage** — Hero (About Me) + Favorites grid + Gallery preview
+2. **Media Gallery Dashboard** — Public browsing + Admin upload/manage
+3. **Auth** — Login + Signup (admin & visitor ប្រើ UI រួម)
+4. **Chat / Messaging** — Visitor thread + Admin inbox
+
+## 4. DesignArena AI Prompt Pack
+
+Copy block នីមួយៗចូល DesignArena AI **ដាច់ដោយឡែក** (ជ្រើស category តាមណែនាំ)។ Prompt នីមួយៗសរសេរឡើងវិញនូវ palette/font ពេញលេញ ដើម្បីធានាភាពស៊ីគ្នា។
+
+### Prompt 1 — Landing Page — category: `Website` / `Landing Page`
+
+```
+Design a warm, peaceful personal portfolio website homepage for a solo creator/developer. Overall mood: "hopecore" — the quiet hope of sunrise over a still Nordic field, inspired by Thorfinn's peaceful farming life in Vinland Saga after he renounces violence — calm, humble, hopeful, no aggression, no dark/cyberpunk/gamer aesthetic.
+
+Color palette (use exactly): background #EEF2EA (pale sage-fog), card/surface #F8F4E9 (warm parchment), text #2B3328 (deep peat ink), primary accent #D9A441 (wheat gold, for buttons/links/highlights), secondary accent #5C7A89 (muted fjord blue), tertiary accent #6E7C52 (moss green, for tags/badges). No pure black, no pure white, no neon.
+
+Typography: a warm soft-serif display font (Fraunces or similar) for headlines and the name, a clean humanist sans-serif (Inter or General Sans) for body copy, and a small tracked monospace (JetBrains Mono) for tiny labels/eyebrows/captions.
+
+Sections, top to bottom:
+1. Sticky top nav — small wordmark/name on left, links (Home / Gallery / Favorites), a "Sign in" text button and a filled "Say hello" button on the right in wheat gold.
+2. Hero — full-width, generous whitespace, a soft radial glow of wheat-gold light behind the name, large serif headline with the person's name, a role/tagline line under it in body font, two buttons: "View Gallery" (filled gold) and "Say hello →" (outline, opens chat/signup). Include a thin horizontal gradient line (moss → gold → fjord blue) near the bottom of the hero like a horizon.
+3. "About me" section — short warm paragraph on the left, a soft-edged photo placeholder on the right with a subtle glowing border.
+4. "Things I love" — a responsive grid of 6-8 cards (favorite things), each with an icon or small image, a title, and a one-line description; 14px rounded corners, soft daylight shadow, gentle lift on hover.
+5. "From the gallery" — a preview strip of 4-5 photo/video thumbnails in a soft masonry layout with a "View full gallery →" link.
+6. Footer — minimal, centered, small text, the horizon gradient line repeated as a top border, social icons in muted ink color.
+
+Motion: content should feel like it gently rises into view — no bounce, no aggressive parallax, no dark mode. The page should feel calm, hopeful, and unhurried, like a quiet morning on a farm, not like a tech startup or a gaming site.
+```
+
+### Prompt 2 — Media Gallery Dashboard — category: `Dashboard`
+
+```
+Design a media gallery dashboard for a personal portfolio website, with two visible states in the same visual language: (A) a public gallery view anyone can browse, and (B) an admin upload/management view for the owner.
+
+Same color palette and fonts throughout: background #EEF2EA, surface #F8F4E9, text #2B3328 (deep peat ink), primary accent #D9A441 wheat gold, secondary accent #5C7A89 fjord blue, tertiary accent #6E7C52 moss green. Display font: warm soft-serif (Fraunces). Body: humanist sans (Inter). Small metadata labels (file size, upload date, filename) in a small tracked monospace font (JetBrains Mono), muted grey-green color.
+
+Public gallery view: a responsive masonry/grid of photo and video thumbnails with soft 12px rounded corners, a gentle scale-up + soft gold shadow on hover, a small overlay on hover showing the title and a moss-green tag/category pill. A filter bar at the top with pill-shaped category filters (All / Photos / Videos / Favorites) using the fjord-blue and moss accents. Clicking a thumbnail implies a soft lightbox/modal with the full media, caption, and upload date.
+
+Admin management view (toggle or separate panel): a large dashed-border drop zone at the top labeled "Drop files here or click to upload" with a soft gold glow on drag-hover, an upload progress bar in wheat gold. Below it, a clean table/list of uploaded media with thumbnail, filename, file size, upload date, a public/private toggle switch, and a subtle trash icon for delete — rows have soft dividers, no harsh borders, generous row height, calm hover highlight in the pale parchment surface color.
+
+Overall mood: organized but gentle — like curating a farm harvest, not a corporate CMS. Calm spacing, soft shadows only, no harsh borders, no dark mode, no gamer/neon styling.
+```
+
+### Prompt 3 — Auth: Login & Signup — category: `UI Component` / `Website`
+
+```
+Design a login and signup screen pair for a personal portfolio + gallery website, shared by two kinds of users: the site's owner/admin (signing in to manage content) and visitors (signing up to chat with the owner). Both screens share one calm, centered card layout on a full-bleed soft background.
+
+Palette: background #EEF2EA with a very soft radial wheat-gold (#D9A441) glow behind the card, card surface #F8F4E9 with 16px rounded corners and a soft diffused shadow (no hard edges), text #2B3328. Primary button filled in wheat gold #D9A441 with cream text, secondary/text links in fjord blue #5C7A89. A thin horizontal gradient line (moss #6E7C52 → gold #D9A441 → fjord blue #5C7A89) sits at the top of the card like a small sunrise, above the form title.
+
+Typography: warm serif (Fraunces) for the card title ("Welcome back" / "Say hello"), humanist sans (Inter) for labels and inputs, small tracked monospace for helper text under fields.
+
+Login screen: title "Welcome back", email field, password field with a soft eye-toggle icon, "Sign in" button in wheat gold, a small "Forgot password?" link in fjord blue, and a bottom line "New here? Create an account" linking to signup.
+
+Signup screen: title "Say hello", name field, email field, password field, a short calm helper line ("Create an account to chat and follow along"), "Create account" button in wheat gold, bottom line "Already have an account? Sign in".
+
+Inputs have soft rounded corners (10px), a subtle moss-green focus ring, and gentle placeholder text in muted grey-green. No harsh red error styling — use a warm muted amber tone for validation messages, not aggressive red. Overall feel: welcoming and unhurried, like being invited in for tea, not a corporate SaaS login wall.
+```
+
+### Prompt 4 — Chat / Messaging — category: `Dashboard` / `UI Component`
+
+```
+Design a calm, minimal direct-messaging interface for a personal portfolio website, where a signed-in visitor can chat one-on-one with the site owner (admin). Show two linked views: (A) a simple chat widget/page for the visitor with a single conversation thread with the owner, and (B) an admin inbox view listing all visitor conversations on the left with the open thread on the right.
+
+Palette: background #EEF2EA, surfaces/bubbles #F8F4E9, text #2B3328. The owner's/admin's message bubbles use a soft wheat-gold tint (#D9A441 at low opacity) with peat-ink text, aligned left; the visitor's own messages use a soft fjord-blue tint (#5C7A89 at low opacity), aligned right. Timestamps in a tiny tracked monospace font (JetBrains Mono), muted grey-green, under each bubble. Bubbles have generous 14px rounded corners, soft shadows, gentle vertical spacing — no harsh chat-bubble tails.
+
+Visitor chat view (A): a clean single-column thread, an input bar at the bottom with a soft rounded text field, a small attachment icon in moss green, and a send button that's a simple wheat-gold circle with an arrow icon. New messages should read as gently rising into place, not popping in.
+
+Admin inbox view (B): a left sidebar list of conversations, each row showing the visitor's avatar (soft circle), name, a one-line message preview, a relative timestamp in small monospace, and an unread-count pill in wheat gold when there are new messages; the selected conversation row has a soft moss-green left border accent. The right panel mirrors the visitor's thread layout but role-reversed, with a header showing the visitor's name and a small "online/last seen" indicator using the fjord-blue accent.
+
+Mood: quiet and personal, like a handwritten letter, not a busy customer-support dashboard. No harsh dividers, no dense corporate tables, generous whitespace, calm color, one gentle recurring gradient accent line (moss → gold → fjord blue) used sparingly as a divider between sidebar and thread, echoing a horizon.
+```
+
+## 5. គន្លឹះរក្សា design ឲ្យស៊ីគ្នារវាងទំព័រ
+
+- Generate **Prompt 1 (Landing)** មុនគេ — ជ្រើសយក output ដែលអ្នកចូលចិត្តបំផុត
+- បើ DesignArena AI មាន option "add reference image" — upload screenshot ពី output ទី 1 ពេល run prompt បន្ទាប់ៗ
+- បើគ្មាន — hex code ដែលកំណត់ជាក់លាក់ក្នុង prompt នីមួយៗ នឹងជួយឲ្យវានៅជិតគ្នា រួចយើងបង្រួបបង្រួម (unify) វាឡើងវិញនៅពេលសរសេរ React/Tailwind ជាក់ស្តែង
+
+## 6. Workflow បន្ទាប់ពី mockup រួច
+
+1. ជ្រើសយក design ដែលឈ្នះ (vote) សម្រាប់ទំព័រនីមួយៗ → export/download code ឬ screenshot
+2. បង្កើត GitHub repo (ឧ. `frontend/` React + `backend/` Laravel ក្នុង monorepo ឬ 2 repo ដាច់ដោយឡែក)
+3. យក exported markup មកសម្រួល (adapt) ជា React components ពិត ភ្ជាប់នឹង design tokens ខាងលើ (Tailwind config)
+4. ខ្ញុំអាចជួយសរសេរ Laravel migrations/models (`users`, `profiles`, `favorites`, `media`, `conversations`, `messages`), Sanctum auth (role `admin`/`visitor`), Reverb websocket broadcasting សម្រាប់ chat, និង MinIO presigned-URL upload endpoints — ពេលអ្នករួចរាល់ mockup
+
+---
+
+ចង់ឲ្យខ្ញុំសរសេរ Laravel database schema/migrations ពេញលេញ (users, favorites, media, conversations, messages) ជាមួយ Sanctum + Reverb setup ឥឡូវនេះ ខណៈពេលអ្នកកំពុងចាំលទ្ធផលពី DesignArena AI ដែរឬទេ?

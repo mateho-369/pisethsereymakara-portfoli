@@ -1,0 +1,131 @@
+# ── Local development stack ──────────────────────────────────────────────────
+# All 5 services run locally: frontend React, Laravel API, MySQL, MinIO.
+# For production on a VM, use docker-compose.prod.yml instead.
+# Start: docker compose up --build -d
+# Test:  sh scripts/smoke-test.sh
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      nginx:
+        condition: service_started
+
+  app:
+    build:
+      context: ./backend
+      dockerfile: docker/php/Dockerfile
+    restart: unless-stopped
+    environment:
+      APP_NAME: Field Notes API
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_KEY: base64:ZmllbGQtbm90ZXMtbG9jYWwta2V5LWNoYW5nZS1tZSE=
+      APP_URL: http://localhost:5173
+      APP_LOCALE: en
+      APP_FALLBACK_LOCALE: en
+      FRONTEND_URL: http://localhost:5173
+      FRONTEND_URLS: http://localhost:5173,http://localhost:8080
+      LOG_CHANNEL: stack
+      LOG_LEVEL: debug
+      CACHE_STORE: database
+      QUEUE_CONNECTION: database
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: field_notes
+      DB_USERNAME: field_notes
+      DB_PASSWORD: field_notes
+      SESSION_DRIVER: database
+      SESSION_LIFETIME: 120
+      SESSION_SECURE_COOKIE: "false"
+      SESSION_SAME_SITE: lax
+      SANCTUM_STATEFUL_DOMAINS: localhost:5173,localhost:8080,127.0.0.1:5173,127.0.0.1:8080
+      FILESYSTEM_DISK: s3
+      AWS_ACCESS_KEY_ID: fieldnotes
+      AWS_SECRET_ACCESS_KEY: local-minio-password
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_BUCKET: portfolio
+      AWS_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_ENDPOINT: http://localhost:9000
+      MINIO_PUBLIC_URL: http://localhost:9000/portfolio
+      ADMIN_NAME: Dara Sovann
+      ADMIN_EMAIL: portfolio.owner@example.com
+      ADMIN_PASSWORD: peaceful123
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: http://localhost:5173/api/auth/google/callback
+    depends_on:
+      mysql:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./backend:/var/www/html:ro
+      - ./backend/docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: field_notes
+      MYSQL_USER: field_notes
+      MYSQL_PASSWORD: field_notes
+      MYSQL_ROOT_PASSWORD: local-mysql-root-password
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: fieldnotes
+      MINIO_ROOT_PASSWORD: local-minio-password
+      MINIO_API_CORS_ALLOW_ORIGIN: "*"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command: >-
+      mc alias set local http://minio:9000 fieldnotes local-minio-password &&
+      mc mb --ignore-existing local/portfolio &&
+      mc anonymous set download local/portfolio
+
+volumes:
+  mysql-data:
+  minio-data:

@@ -1,5 +1,5 @@
 {
-  "name": "pisethsereymakara-portfoli",
+  "name": "field-notes-portfolio",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -22,7 +22,7 @@
     "tailwindcss": "^4.2.1"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "latest",
+    "@cloudflare/vite-plugin": "^1.50.0",
     "@eslint/js": "^9.39.1",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.7",

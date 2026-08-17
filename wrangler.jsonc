@@ -2,8 +2,13 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "pisethsereymakara-portfoli",
   "compatibility_date": "2026-08-03",
+  "main": "worker/index.js",
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
     "not_found_handling": "single-page-application"
+  },
+  "vars": {
+    "API_PROXY_TARGET": "http://pisethsereymakara.duckdns.org:8080"
   }
 }

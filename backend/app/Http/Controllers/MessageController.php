@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PortfolioConversation;
 use App\Models\PortfolioMessage;
+use App\Support\MediaStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -12,7 +13,13 @@ class MessageController extends Controller
     public function index(Request $request, PortfolioConversation $conversation): JsonResponse
     {
         $this->authorizeConversation($request, $conversation);
-        return response()->json($conversation->messages()->orderBy('created_at')->get());
+
+        return response()->json(
+            $conversation->messages()
+                ->orderBy('created_at')
+                ->get()
+                ->map(fn (PortfolioMessage $message) => $this->present($message))
+        );
     }
 
     public function store(Request $request, PortfolioConversation $conversation): JsonResponse
@@ -34,8 +41,44 @@ class MessageController extends Controller
         $conversation->update([
             'last_message_at' => now(),
             'unread_count' => $isAdmin ? 0 : $conversation->unread_count + 1,
+            'status' => $isAdmin ? $conversation->status : 'open',
         ]);
-        return response()->json($message, 201);
+
+        return response()->json($this->present($message), 201);
+    }
+
+    /**
+     * Owner moderation: the letter stays in place as a quiet placeholder, while
+     * its text and any stored attachment are removed for good.
+     */
+    public function destroy(PortfolioMessage $message): JsonResponse
+    {
+        if (! $message->isRemoved()) {
+            MediaStorage::delete($message->attachment_url);
+            $message->update([
+                'body' => '',
+                'attachment_url' => null,
+                'deleted_at' => now(),
+                'deleted_by' => 'admin',
+            ]);
+        }
+
+        return response()->json($this->present($message->fresh()));
+    }
+
+    /** Removed letters never leak their old contents to the client. */
+    private function present(PortfolioMessage $message): array
+    {
+        return [
+            'id' => $message->id,
+            'conversation_id' => $message->conversation_id,
+            'sender_id' => $message->sender_id,
+            'sender_role' => $message->sender_role,
+            'body' => $message->isRemoved() ? '' : $message->body,
+            'attachment_url' => $message->isRemoved() ? null : $message->attachment_url,
+            'created_at' => optional($message->created_at)->toIso8601String(),
+            'deleted_at' => optional($message->deleted_at)->toIso8601String(),
+        ];
     }
 
     private function authorizeConversation(Request $request, PortfolioConversation $conversation): void

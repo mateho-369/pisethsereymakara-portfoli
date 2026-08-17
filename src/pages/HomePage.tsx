@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowDown, ArrowRight, BookOpen, Camera, Coffee, Code2, Compass, Heart, Leaf, MapPin, Mountain, Music, Sparkles } from 'lucide-react';
+import { ArrowDown, ArrowRight, MapPin, Sparkles } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import type { Favorite, MediaItem, Profile } from '../types';
 import LoadingState from '../components/LoadingState';
+import { useContent } from '../contexts/ContentContext';
 import { api } from '../lib/api';
-
-const favoriteIcons: Record<string, typeof Leaf> = { leaf: Leaf, camera: Camera, coffee: Coffee, code: Code2, compass: Compass, mountain: Mountain, music: Music, book: BookOpen };
+import { favoriteIcon } from '../lib/icons';
 const reveal = { initial: { opacity: 0, y: 14 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, amount: 0.18 }, transition: { duration: 0.7, ease: 'easeOut' as const } };
 
 export default function HomePage() {
@@ -16,6 +16,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const location = useLocation();
+  const { text } = useContent();
 
   useEffect(() => {
     Promise.all([api.profile.get(), api.favorites.list(), api.media.list()])
@@ -45,7 +46,7 @@ export default function HomePage() {
         <div className="hero-glow" />
         <div className="page-shell relative flex min-h-[calc(100vh-76px)] flex-col justify-center py-20 md:py-28">
           <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.85 }} className="max-w-4xl">
-            <p className="eyebrow mb-6"><Sparkles size={13} /> A quiet corner of the internet</p>
+            <p className="eyebrow mb-6"><Sparkles size={13} /> {text('home.hero.eyebrow', 'A quiet corner of the internet')}</p>
             <h1 className="font-serif text-[clamp(3.8rem,10vw,8.6rem)] leading-[0.88] tracking-[-0.065em]" style={{ color: 'var(--ink)' }}>
               {profile.display_name.split(' ').map((word, i) => (
                 <span key={word} style={i === 1 ? { color: 'var(--moss)' } : {}}>{word}{' '}</span>
@@ -59,8 +60,8 @@ export default function HomePage() {
               </span>
             </div>
             <div className="mt-10 flex flex-wrap gap-3">
-              <Link to="/gallery" className="btn-primary">View gallery <ArrowRight size={17} /></Link>
-              <Link to="/chat" className="btn-outline">Say hello <ArrowRight size={17} /></Link>
+              <Link to="/gallery" className="btn-primary">{text('home.hero.primary_cta', 'View gallery')} <ArrowRight size={17} /></Link>
+              <Link to="/chat" className="btn-outline">{text('home.hero.secondary_cta', 'Say hello')} <ArrowRight size={17} /></Link>
             </div>
           </motion.div>
           <div className="absolute bottom-10 left-5 right-5 flex items-center gap-4 sm:left-8 sm:right-8">
@@ -74,9 +75,10 @@ export default function HomePage() {
       <section className="page-shell py-24 md:py-32">
         <motion.div {...reveal} className="grid items-center gap-12 lg:grid-cols-[1.05fr_.85fr] lg:gap-20">
           <div>
-            <p className="eyebrow">01 · About me</p>
+            <p className="eyebrow">{text('home.about.eyebrow', '01 · About me')}</p>
             <h2 className="section-title mt-5" style={{ color: 'var(--ink)' }}>
-              Making room for<br /><em className="font-normal" style={{ color: 'var(--fjord)' }}>wonder.</em>
+              {text('home.about.title_line_one', 'Making room for')}<br />
+              <em className="font-normal" style={{ color: 'var(--fjord)' }}>{text('home.about.title_line_two', 'wonder.')}</em>
             </h2>
             <p className="mt-7 max-w-2xl text-lg leading-[1.85]" style={{ color: 'var(--ink-2)' }}>{profile.bio}</p>
             <blockquote className="mt-8 border-l-2 pl-5 font-serif text-xl italic leading-relaxed" style={{ borderColor: 'var(--gold)', color: 'var(--ink)' }}>
@@ -87,7 +89,7 @@ export default function HomePage() {
             <div className="absolute -inset-3 rounded-[2rem] blur-xl" style={{ background: 'linear-gradient(135deg, rgba(217,164,65,.25), transparent, rgba(92,122,137,.25))' }} />
             <img src={profile.avatar_url} alt={`${profile.display_name} outdoors`} className="relative aspect-[4/5] w-full rounded-[1.7rem] object-cover" style={{ boxShadow: 'var(--shadow-xl)' }} />
             <span className="absolute -bottom-4 -left-4 rounded-full border px-4 py-2 font-mono text-[9px] uppercase tracking-[0.18em]" style={{ borderColor: 'rgba(217,164,65,.25)', background: 'var(--bg-surface)', color: 'var(--ink-3)' }}>
-              Here, now, grateful
+              {text('home.about.badge', 'Here, now, grateful')}
             </span>
           </div>
         </motion.div>
@@ -98,16 +100,16 @@ export default function HomePage() {
         <div className="page-shell">
           <motion.div {...reveal} className="mb-12 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
-              <p className="eyebrow">02 · Small joys</p>
-              <h2 className="section-title mt-5" style={{ color: 'var(--ink)' }}>Things I love</h2>
+              <p className="eyebrow">{text('home.favorites.eyebrow', '02 · Small joys')}</p>
+              <h2 className="section-title mt-5" style={{ color: 'var(--ink)' }}>{text('home.favorites.title', 'Things I love')}</h2>
             </div>
             <p className="max-w-sm text-sm leading-relaxed" style={{ color: 'var(--ink-3)' }}>
-              A collection of things that keep me curious, grounded, and moving gently through the world.
+              {text('home.favorites.intro', 'A collection of things that keep me curious, grounded, and moving gently through the world.')}
             </p>
           </motion.div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {favorites.map((fav, i) => {
-              const Icon = favoriteIcons[fav.icon] || Heart;
+              const Icon = favoriteIcon(fav.icon);
               return (
                 <motion.article key={fav.id} {...reveal} transition={{ duration: 0.55, delay: i * 0.05 }} className="favorite-card group">
                   <span className="grid h-11 w-11 place-items-center rounded-full transition-colors" style={{ background: 'rgba(110,124,82,.1)', color: 'var(--moss)' }}>
@@ -126,10 +128,10 @@ export default function HomePage() {
       <section className="page-shell py-24 md:py-32">
         <motion.div {...reveal} className="mb-12 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
           <div>
-            <p className="eyebrow">03 · Field journal</p>
-            <h2 className="section-title mt-5" style={{ color: 'var(--ink)' }}>From the gallery</h2>
+            <p className="eyebrow">{text('home.gallery.eyebrow', '03 · Field journal')}</p>
+            <h2 className="section-title mt-5" style={{ color: 'var(--ink)' }}>{text('home.gallery.title', 'From the gallery')}</h2>
           </div>
-          <Link to="/gallery" className="text-link">View full gallery <ArrowRight size={16} /></Link>
+          <Link to="/gallery" className="text-link">{text('home.gallery.link', 'View full gallery')} <ArrowRight size={16} /></Link>
         </motion.div>
         <div className="grid auto-rows-[180px] grid-cols-2 gap-3 md:auto-rows-[230px] md:grid-cols-4">
           {media.slice(0, 5).map((item, i) => (
@@ -149,14 +151,14 @@ export default function HomePage() {
       <section className="page-shell pb-12">
         <motion.div {...reveal} className="relative overflow-hidden rounded-[2rem] px-6 py-16 text-center sm:px-12 md:py-20" style={{ background: 'var(--bg-muted)' }}>
           <div className="absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl" style={{ background: 'rgba(217,164,65,.08)' }} />
-          <p className="eyebrow relative justify-center" style={{ color: 'var(--gold)' }}>The door is open</p>
+          <p className="eyebrow relative justify-center" style={{ color: 'var(--gold)' }}>{text('home.cta.eyebrow', 'The door is open')}</p>
           <h2 className="relative mt-5 font-serif text-4xl tracking-tight sm:text-5xl" style={{ color: 'var(--ink)' }}>
-            Let's exchange a few kind words.
+            {text('home.cta.title', "Let's exchange a few kind words.")}
           </h2>
           <p className="relative mx-auto mt-5 max-w-xl" style={{ color: 'var(--ink-2)' }}>
-            No pitch, no pressure. Just a quiet conversation about ideas, images, or whatever is bringing you hope lately.
+            {text('home.cta.body', 'No pitch, no pressure. Just a quiet conversation about ideas, images, or whatever is bringing you hope lately.')}
           </p>
-          <Link to="/chat" className="btn-primary relative mt-8">Start a conversation <ArrowRight size={17} /></Link>
+          <Link to="/chat" className="btn-primary relative mt-8">{text('home.cta.button', 'Start a conversation')} <ArrowRight size={17} /></Link>
         </motion.div>
       </section>
     </>

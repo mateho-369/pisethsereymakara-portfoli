@@ -3,23 +3,24 @@
 namespace App\Http\Controllers;
 
 use App\Models\PortfolioMedia;
+use App\Support\MediaStorage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Support\Facades\Storage;
 
 class MediaController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
         $query = PortfolioMedia::query()->where('is_public', true);
-        return response()->json($this->filters($query, $request)->orderByDesc('captured_at')->get());
+
+        return response()->json($this->ordered($this->filters($query, $request))->get());
     }
 
     public function adminIndex(Request $request): JsonResponse
     {
-        return response()->json($this->filters(PortfolioMedia::query(), $request)->orderByDesc('captured_at')->get());
+        return response()->json($this->ordered($this->filters(PortfolioMedia::query(), $request))->get());
     }
 
     public function store(Request $request): JsonResponse
@@ -36,27 +37,67 @@ class MediaController extends Controller
             'captured_at' => ['required', 'date'],
             'is_favorite' => ['required', 'boolean'],
             'is_public' => ['required', 'boolean'],
+            'sort_order' => ['sometimes', 'integer', 'min:0'],
         ]));
+
         return response()->json($media, 201);
     }
 
+    /**
+     * Full edit, including swapping in a freshly uploaded file. When the file
+     * changes the previous object is removed from storage so nothing is orphaned.
+     */
     public function update(Request $request, PortfolioMedia $media): JsonResponse
     {
-        $media->update($request->validate([
+        $validated = $request->validate([
             'title' => ['sometimes', 'required', 'string', 'max:160'],
             'description' => ['sometimes', 'nullable', 'string', 'max:2000'],
+            'media_type' => ['sometimes', 'required', 'in:photo,video'],
             'category' => ['sometimes', 'required', 'string', 'max:80'],
+            'thumbnail_url' => ['sometimes', 'required', 'url', 'max:2000'],
+            'media_url' => ['sometimes', 'required', 'url', 'max:2000'],
+            'size_label' => ['sometimes', 'required', 'string', 'max:30'],
+            'aspect_ratio' => ['sometimes', 'required', 'in:portrait,landscape,square'],
+            'captured_at' => ['sometimes', 'required', 'date'],
             'is_favorite' => ['sometimes', 'boolean'],
             'is_public' => ['sometimes', 'boolean'],
-        ]));
-        return response()->json($media->fresh());
+            'sort_order' => ['sometimes', 'integer', 'min:0'],
+        ]);
+
+        $replaced = array_filter([
+            array_key_exists('media_url', $validated) && $validated['media_url'] !== $media->media_url ? $media->media_url : null,
+            array_key_exists('thumbnail_url', $validated) && $validated['thumbnail_url'] !== $media->thumbnail_url ? $media->thumbnail_url : null,
+        ]);
+
+        $media->update($validated);
+
+        // Never delete an object that is still referenced by the updated row.
+        $fresh = $media->fresh();
+        MediaStorage::deleteMany(array_diff($replaced, [$fresh->media_url, $fresh->thumbnail_url]));
+
+        return response()->json($fresh);
+    }
+
+    /** Persist the owner's drag-and-drop ordering for the gallery. */
+    public function reorder(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'order' => ['required', 'array', 'min:1'],
+            'order.*' => ['integer', 'min:1'],
+        ]);
+
+        foreach (array_values($validated['order']) as $index => $id) {
+            PortfolioMedia::query()->whereKey($id)->update(['sort_order' => $index + 1]);
+        }
+
+        return $this->adminIndex($request);
     }
 
     public function destroy(PortfolioMedia $media): Response
     {
-        $this->deleteObject($media->media_url);
-        if ($media->thumbnail_url !== $media->media_url) $this->deleteObject($media->thumbnail_url);
+        MediaStorage::deleteMany([$media->media_url, $media->thumbnail_url]);
         $media->delete();
+
         return response()->noContent();
     }
 
@@ -65,14 +106,19 @@ class MediaController extends Controller
         if ($request->filled('type')) $query->where('media_type', $request->string('type'));
         if ($request->filled('category')) $query->where('category', $request->string('category'));
         if ($request->boolean('favorites')) $query->where('is_favorite', true);
+        if ($request->filled('search')) {
+            $search = (string) $request->string('search');
+            $query->where(fn (Builder $inner) => $inner->where('title', 'like', "%{$search}%")->orWhere('category', 'like', "%{$search}%"));
+        }
+
         return $query;
     }
 
-    private function deleteObject(string $url): void
+    /** Manual order first (0 = unsorted), newest capture date after that. */
+    private function ordered(Builder $query): Builder
     {
-        $bucket = trim((string) config('filesystems.disks.s3.bucket'), '/');
-        $path = ltrim((string) parse_url($url, PHP_URL_PATH), '/');
-        if (str_starts_with($path, $bucket.'/')) $path = substr($path, strlen($bucket) + 1);
-        if ($path !== '') Storage::disk('s3')->delete($path);
+        return $query->orderByRaw('CASE WHEN sort_order = 0 THEN 1 ELSE 0 END')
+            ->orderBy('sort_order')
+            ->orderByDesc('captured_at');
     }
 }

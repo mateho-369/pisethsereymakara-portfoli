@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, FileText, Inbox, LoaderCircle, MessageCircle, Paperclip, Search, Send } from 'lucide-react';
+import { Archive, ArchiveRestore, ArrowLeft, Ban, FileText, Inbox, LoaderCircle, MessageCircle, Paperclip, Search, Send, ShieldCheck, Trash2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useContent } from '../contexts/ContentContext';
 import { api } from '../lib/api';
 import type { Conversation, Message, Profile } from '../types';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
+import { useToast } from '../components/ui/Toast';
 import LoadingState from '../components/LoadingState';
 
 function relativeTime(value: string) {
@@ -16,6 +19,12 @@ function relativeTime(value: string) {
 
 export default function ChatPage() {
   const { user, isAdmin } = useAuth();
+  const { text } = useContent();
+  const { success, error: toastError } = useToast();
+  const [folder, setFolder] = useState<'open' | 'archived'>('open');
+  const [pendingRemoval, setPendingRemoval] = useState<Message | null>(null);
+  const [pendingThread, setPendingThread] = useState<Conversation | null>(null);
+  const blocked = Boolean(user?.blocked_at) && !isAdmin;
   const [profile, setProfile] = useState<Profile | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selected, setSelected] = useState<Conversation | null>(null);
@@ -37,7 +46,7 @@ export default function ChatPage() {
   const fetchConversations = useCallback(async () => {
     if (!user) return;
     try {
-      let data = await api.conversations.list(isAdmin);
+      let data = await api.conversations.list(isAdmin, folder);
       if (!isAdmin && data.length === 0) {
         const created = await api.conversations.create();
         data = [created];
@@ -46,7 +55,7 @@ export default function ChatPage() {
       setSelected((cur) => cur ? data.find((c: Conversation) => c.id === cur.id) || data[0] || null : data[0] || null);
     } catch (err) { setError(err instanceof Error ? err.message : 'Could not open conversations.'); }
     finally { setLoading(false); }
-  }, [isAdmin, user]);
+  }, [isAdmin, user, folder]);
 
   useEffect(() => { api.profile.get().then(setProfile).catch(() => null); fetchConversations(); }, [fetchConversations]);
   useEffect(() => { if (selected) fetchMessages(selected.id).catch((e) => setError(e.message)); else setMessages([]); }, [selected?.id, fetchMessages]);
@@ -61,6 +70,52 @@ export default function ChatPage() {
   const chooseConversation = async (c: Conversation) => {
     setSelected(c);
     if (isAdmin && c.unread_count > 0) { await api.conversations.markRead(c.id); fetchConversations(); }
+  };
+
+  const removeMessage = async (message: Message) => {
+    try {
+      await api.messages.remove(message.id);
+      if (selected) await fetchMessages(selected.id);
+      success('The letter was removed.');
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : 'Could not remove this message.');
+    }
+  };
+
+  const setArchived = async (conversation: Conversation, archived: boolean) => {
+    try {
+      if (archived) await api.conversations.archive(conversation.id);
+      else await api.conversations.restore(conversation.id);
+      setSelected(null);
+      await fetchConversations();
+      success(archived ? 'Conversation archived.' : 'Conversation restored.');
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : 'Could not move this conversation.');
+    }
+  };
+
+  const removeThread = async (conversation: Conversation) => {
+    try {
+      await api.conversations.remove(conversation.id);
+      setSelected(null);
+      await fetchConversations();
+      success('Conversation deleted.');
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : 'Could not delete this conversation.');
+    }
+  };
+
+  const toggleVisitorBlock = async (conversation: Conversation) => {
+    const id = conversation.visitor_user_id;
+    if (!id) return toastError('This visitor no longer has an account.');
+    try {
+      if (conversation.visitor_blocked) await api.admin.users.unblock(id);
+      else await api.admin.users.block(id);
+      await fetchConversations();
+      success(conversation.visitor_blocked ? 'They can write to you again.' : 'Messaging is paused for this visitor.');
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : 'Could not change this visitor.');
+    }
   };
 
   const send = async () => {
@@ -90,8 +145,8 @@ export default function ChatPage() {
     <div className="page-shell py-6 md:py-10">
       <div className="mb-7 flex items-end justify-between">
         <div>
-          <p className="eyebrow"><MessageCircle size={13} /> Personal letters</p>
-          <h1 className="mt-3 font-serif text-4xl tracking-tight" style={{ color: 'var(--ink)' }}>{isAdmin ? 'Your inbox' : 'A quiet conversation'}</h1>
+          <p className="eyebrow"><MessageCircle size={13} /> {text('chat.eyebrow', 'Personal letters')}</p>
+          <h1 className="mt-3 font-serif text-4xl tracking-tight" style={{ color: 'var(--ink)' }}>{isAdmin ? text('chat.title_owner', 'Your inbox') : text('chat.title_visitor', 'A quiet conversation')}</h1>
         </div>
         {isAdmin && (
           <span className="hidden rounded-full px-3 py-1.5 font-mono text-[9px] uppercase tracking-[.14em] sm:block" style={{ background: 'var(--gold-pale)', color: 'var(--gold-deep)' }}>
@@ -106,10 +161,21 @@ export default function ChatPage() {
         {/* ── Sidebar (admin only) ── */}
         {isAdmin && (
           <aside className={`${selected ? 'hidden md:flex' : 'flex'} min-h-[650px] flex-col border-r md:flex`} style={{ borderColor: 'var(--border-soft)', background: 'var(--chat-aside)' }}>
-            <div className="p-4">
+            <div className="space-y-3 p-4">
               <div className="relative">
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--ink-3)' }} />
                 <input value={search} onChange={(e) => setSearch(e.target.value)} className="input-field !py-2.5 !pl-10" placeholder="Search people" />
+              </div>
+              <div className="flex gap-2">
+                {(['open', 'archived'] as const).map((name) => (
+                  <button
+                    key={name}
+                    onClick={() => { setFolder(name); setSelected(null); }}
+                    className={`filter-pill ${folder === name ? 'filter-pill-active' : ''}`}
+                  >
+                    {name === 'open' ? 'Inbox' : 'Archived'}
+                  </button>
+                ))}
               </div>
             </div>
             <div className="flex-1 overflow-y-auto px-2 pb-3">
@@ -149,28 +215,55 @@ export default function ChatPage() {
                 <div>
                   <h2 className="font-serif text-lg" style={{ color: 'var(--ink)' }}>{otherName || 'Your conversation'}</h2>
                   <p className="mt-0.5 flex items-center gap-1.5 font-mono text-[8px] uppercase tracking-[.13em]" style={{ color: 'var(--ink-3)' }}>
-                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--fjord)' }} /> Here in the quiet
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: selected.visitor_blocked ? 'var(--gold)' : 'var(--fjord)' }} />
+                    {isAdmin && selected.visitor_blocked ? 'Messaging paused' : text('chat.presence', 'Here in the quiet')}
                   </p>
                 </div>
+
+                {isAdmin && (
+                  <div className="ml-auto flex items-center gap-1">
+                    <button onClick={() => toggleVisitorBlock(selected)} className="icon-button" title={selected.visitor_blocked ? 'Allow messaging' : 'Pause messaging'} aria-label="Toggle messaging">
+                      {selected.visitor_blocked ? <ShieldCheck size={17} /> : <Ban size={17} />}
+                    </button>
+                    <button onClick={() => setArchived(selected, selected.status !== 'archived')} className="icon-button" title={selected.status === 'archived' ? 'Restore' : 'Archive'} aria-label="Archive conversation">
+                      {selected.status === 'archived' ? <ArchiveRestore size={17} /> : <Archive size={17} />}
+                    </button>
+                    <button onClick={() => setPendingThread(selected)} className="icon-button" title="Delete conversation" aria-label="Delete conversation">
+                      <Trash2 size={17} />
+                    </button>
+                  </div>
+                )}
               </header>
 
               <div className="flex-1 space-y-5 overflow-y-auto p-4 sm:p-7" style={{ background: `radial-gradient(circle at 50% 0%, var(--gold-pale), transparent 42%)` }}>
                 {messages.length === 0 && (
                   <div className="mx-auto max-w-sm py-20 text-center">
                     <MessageCircle className="mx-auto" size={25} style={{ color: 'var(--moss)' }} />
-                    <h3 className="mt-4 font-serif text-2xl" style={{ color: 'var(--ink)' }}>Begin with a simple hello.</h3>
-                    <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--ink-3)' }}>This is a small, private space for a thoughtful conversation.</p>
+                    <h3 className="mt-4 font-serif text-2xl" style={{ color: 'var(--ink)' }}>{text('chat.empty_title', 'Begin with a simple hello.')}</h3>
+                    <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--ink-3)' }}>{text('chat.empty_body', 'This is a small, private space for a thoughtful conversation.')}</p>
                   </div>
                 )}
                 <AnimatePresence initial={false}>
                   {messages.map((msg) => {
                     const mine = msg.sender_id === String(user?.id);
+                    const removed = Boolean(msg.deleted_at);
                     return (
-                      <motion.div key={msg.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+                      <motion.div key={msg.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={`group flex items-center gap-2 ${mine ? 'justify-end' : 'justify-start'}`}>
+                        {isAdmin && !removed && (
+                          <button
+                            onClick={() => setPendingRemoval(msg)}
+                            className="icon-button !h-8 !w-8 opacity-0 transition group-hover:opacity-100"
+                            aria-label="Remove this message"
+                            title="Remove this message"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
                         <div className={`max-w-[82%] sm:max-w-[68%] ${mine ? 'text-right' : 'text-left'}`}>
-                          <div className={`message-bubble ${mine ? 'message-mine' : 'message-theirs'}`} style={{ color: 'var(--ink)' }}>
-                            {msg.body && <p className="whitespace-pre-wrap">{msg.body}</p>}
-                            {msg.attachment_url && (
+                          <div className={`message-bubble ${mine ? 'message-mine' : 'message-theirs'}`} style={{ color: removed ? 'var(--ink-4)' : 'var(--ink)' }}>
+                            {removed && <p className="italic">{text('chat.removed_message', 'This message was removed by the owner.')}</p>}
+                            {!removed && msg.body && <p className="whitespace-pre-wrap">{msg.body}</p>}
+                            {!removed && msg.attachment_url && (
                               <a href={msg.attachment_url} target="_blank" rel="noreferrer" className="mt-2 flex items-center gap-2 rounded-lg p-2 text-sm underline" style={{ background: 'var(--bg-muted)' }}>
                                 <FileText size={16} /> View attachment
                               </a>
@@ -188,6 +281,12 @@ export default function ChatPage() {
               </div>
 
               <div className="border-t p-3 sm:p-5" style={{ borderColor: 'var(--border-soft)' }}>
+                {blocked ? (
+                  <p className="rounded-xl px-4 py-3 text-sm leading-relaxed" style={{ background: 'var(--gold-pale)', color: 'var(--gold-deep)' }}>
+                    {text('chat.blocked_notice', 'Messaging is paused for this account. You are still welcome to browse the journal.')}
+                  </p>
+                ) : (
+                <>
                 {attachment && (
                   <div className="mb-2 flex items-center justify-between rounded-lg px-3 py-2 text-xs" style={{ background: 'var(--border-soft)', color: 'var(--ink-2)' }}>
                     <span className="flex items-center gap-2"><FileText size={14} /> Attachment ready</span>
@@ -205,7 +304,7 @@ export default function ChatPage() {
                     onChange={(e) => setDraft(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
                     className="max-h-28 min-h-10 flex-1 resize-none bg-transparent px-2 py-2.5 text-sm outline-none"
-                    placeholder="Write something kind…"
+                    placeholder={text('chat.placeholder', 'Write something kind…')}
                     style={{ color: 'var(--ink)' }}
                   />
                   <button
@@ -218,6 +317,8 @@ export default function ChatPage() {
                     {sending ? <LoaderCircle className="animate-spin" size={17} /> : <Send size={16} />}
                   </button>
                 </div>
+                </>
+                )}
               </div>
             </>
           ) : (
@@ -229,6 +330,26 @@ export default function ChatPage() {
           )}
         </section>
       </div>
+
+      <ConfirmDialog
+        open={pendingRemoval !== null}
+        title="Remove this message?"
+        description="The text and any attachment are deleted for good. A short note stays in the thread so the conversation still reads clearly."
+        confirmLabel="Remove"
+        tone="destructive"
+        onConfirm={async () => { if (pendingRemoval) await removeMessage(pendingRemoval); }}
+        onClose={() => setPendingRemoval(null)}
+      />
+
+      <ConfirmDialog
+        open={pendingThread !== null}
+        title="Delete this conversation?"
+        description={`Every letter with ${pendingThread?.visitor_name || 'this visitor'} will be permanently deleted. Archiving keeps them instead.`}
+        confirmLabel="Delete everything"
+        tone="destructive"
+        onConfirm={async () => { if (pendingThread) await removeThread(pendingThread); }}
+        onClose={() => setPendingThread(null)}
+      />
     </div>
   );
 }

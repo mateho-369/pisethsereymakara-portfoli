@@ -58,35 +58,35 @@ for attempt in $(seq 1 60); do
   sleep 2
 done
 
-echo "1/7 Laravel, MySQL, MinIO, public profile, and gallery"
+echo "1/10 Laravel, MySQL, MinIO, public profile, and gallery"
 STATUS="$(curl -fsS -H "Accept: application/json" "$BASE_URL/api/status")"
 printf '%s' "$STATUS" | json_value "['database_driver']" | grep -q '^mysql$'
 printf '%s' "$STATUS" | json_value "['checks']['minio']" | grep -q -E '^(True|true|1)$'
 curl -fsS -H "Accept: application/json" "$BASE_URL/api/profile" | json_value "['display_name']" >/dev/null
 curl -fsS -H "Accept: application/json" "$BASE_URL/api/media" | json_value "[0]['id']" >/dev/null
 
-echo "2/7 Registering a visitor"
+echo "2/10 Registering a visitor"
 csrf
 VISITOR_EMAIL="smoke.$(date +%s)@example.test"
-post "/api/auth/register" "{\"name\":\"Smoke Test Visitor\",\"email\":\"$VISITOR_EMAIL\",\"password\":\"testing123\"}" | json_value "['user']['id']" >/dev/null
+VISITOR_ID="$(post "/api/auth/register" "{\"name\":\"Smoke Test Visitor\",\"email\":\"$VISITOR_EMAIL\",\"password\":\"testing123\"}" | json_value "['user']['id']")"
 
-echo "3/7 Creating a conversation and writing a message"
+echo "3/10 Creating a conversation and writing a message"
 CONVERSATION="$(post "/api/conversations" '{}')"
 CONVERSATION_ID="$(printf '%s' "$CONVERSATION" | json_value "['id']")"
 MESSAGE="$(post "/api/conversations/$CONVERSATION_ID/messages" '{"body":"Hello from the Docker smoke test. The Laravel API can write messages."}')"
 printf '%s' "$MESSAGE" | json_value "['id']" >/dev/null
 curl -fsS -b "$COOKIE_JAR" -H "Accept: application/json" "$BASE_URL/api/conversations/$CONVERSATION_ID/messages" | json_value "[-1]['body']" | grep -q "Docker smoke test"
 
-echo "4/7 Signing in as the owner"
+echo "4/10 Signing in as the owner"
 post "/api/auth/logout" '{}' >/dev/null
 csrf
 post "/api/auth/login" "{\"email\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}" | json_value "['user']['role']" | grep -q admin
 
-echo "5/7 Reading the owner inbox and marking the message read"
+echo "5/10 Reading the owner inbox and marking the message read"
 curl -fsS -b "$COOKIE_JAR" -H "Accept: application/json" "$BASE_URL/api/admin/conversations" | json_value "[0]['id']" >/dev/null
 post "/api/admin/conversations/$CONVERSATION_ID/read" '{}' | json_value "['unread_count']" | grep -q '^0$'
 
-echo "6/7 Uploading a real image directly to MinIO"
+echo "6/10 Uploading a real image directly to MinIO"
 python3 - "$WORK_DIR/smoke.png" <<'PY'
 import base64, sys
 png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
@@ -99,7 +99,7 @@ PUBLIC_URL="$(printf '%s' "$SIGNED" | json_value "['public_url']")"
 curl -fsS -X PUT -H "Content-Type: image/png" --data-binary "@$WORK_DIR/smoke.png" "$UPLOAD_URL" >/dev/null
 curl -fsS "$PUBLIC_URL" >/dev/null
 
-echo "7/7 Creating, updating, and deleting the uploaded media record"
+echo "7/10 Creating, updating, and deleting the uploaded media record"
 MEDIA="$(post "/api/admin/media" "{\"title\":\"Docker smoke test\",\"description\":\"Temporary end-to-end test image.\",\"media_type\":\"photo\",\"category\":\"Test\",\"thumbnail_url\":\"$PUBLIC_URL\",\"media_url\":\"$PUBLIC_URL\",\"size_label\":\"$SIZE bytes\",\"aspect_ratio\":\"square\",\"captured_at\":\"2026-01-01T00:00:00Z\",\"is_favorite\":false,\"is_public\":true}")"
 MEDIA_ID="$(printf '%s' "$MEDIA" | json_value "['id']")"
 put "/api/admin/media/$MEDIA_ID" '{"is_public":false}' | json_value "['is_public']" | grep -q -E '^(False|false|0)$'
@@ -109,4 +109,34 @@ if curl -fsS "$PUBLIC_URL" >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "All tests passed: frontend proxy, Sanctum auth, MySQL writes, chat, admin authorization, and MinIO uploads work together."
+echo "8/10 Editing site text and restoring the original wording"
+curl -fsS -H "Accept: application/json" "$BASE_URL/api/settings" | json_value "['home.cta.title']" >/dev/null
+put "/api/admin/settings" '{"settings":{"footer.tagline":"Smoke tested, gently."}}' >/dev/null
+curl -fsS -H "Accept: application/json" "$BASE_URL/api/settings" | json_value "['footer.tagline']" | grep -q "Smoke tested, gently."
+post "/api/admin/settings/reset" '{"key":"footer.tagline"}' >/dev/null
+curl -fsS -H "Accept: application/json" "$BASE_URL/api/settings" | json_value "['footer.tagline']" | grep -q "Made slowly, shared warmly."
+
+echo "9/10 Moderating the conversation: removing a letter, archiving, restoring"
+MESSAGE_ID="$(printf '%s' "$MESSAGE" | json_value "['id']")"
+delete_request "/api/admin/messages/$MESSAGE_ID"
+curl -fsS -b "$COOKIE_JAR" -H "Accept: application/json" "$BASE_URL/api/conversations/$CONVERSATION_ID/messages" | json_value "[-1]['body']" | grep -qv "Docker smoke test"
+post "/api/admin/conversations/$CONVERSATION_ID/archive" '{}' | json_value "['status']" | grep -q '^archived$'
+curl -fsS -b "$COOKIE_JAR" -H "Accept: application/json" "$BASE_URL/api/admin/conversations?status=archived" | json_value "[0]['id']" >/dev/null
+post "/api/admin/conversations/$CONVERSATION_ID/restore" '{}' | json_value "['status']" | grep -q '^open$'
+
+echo "10/10 Pausing the visitor, proving the chat is closed, then cleaning up"
+post "/api/admin/users/$VISITOR_ID/block" '{"reason":"smoke test"}' | json_value "['blocked_at']" >/dev/null
+post "/api/auth/logout" '{}' >/dev/null
+csrf
+post "/api/auth/login" "{\"email\":\"$VISITOR_EMAIL\",\"password\":\"testing123\"}" >/dev/null
+BLOCKED_STATUS="$(curl -s -o /dev/null -w '%{http_code}' -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
+  -H "Accept: application/json" -H "Content-Type: application/json" -H "X-XSRF-TOKEN: $XSRF_TOKEN" \
+  -X POST "$BASE_URL/api/conversations/$CONVERSATION_ID/messages" -d '{"body":"This should be refused."}')"
+[ "$BLOCKED_STATUS" = "403" ] || { echo "A paused visitor could still send a message (HTTP $BLOCKED_STATUS)." >&2; exit 1; }
+curl -fsS -b "$COOKIE_JAR" -H "Accept: application/json" "$BASE_URL/api/conversations/$CONVERSATION_ID/messages" >/dev/null
+post "/api/auth/logout" '{}' >/dev/null
+csrf
+post "/api/auth/login" "{\"email\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}" >/dev/null
+delete_request "/api/admin/users/$VISITOR_ID"
+
+echo "All tests passed: frontend proxy, Sanctum auth, MySQL writes, chat, editable site text, chat moderation, visitor blocking, admin authorization, and MinIO uploads work together."

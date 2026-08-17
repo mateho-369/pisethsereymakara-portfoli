@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, Eye, EyeOff, Image as ImageIcon, LoaderCircle, Play, Star, Trash2, UploadCloud, Video, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useContent } from '../contexts/ContentContext';
 import type { MediaItem } from '../types';
 import LoadingState from '../components/LoadingState';
 import { api } from '../lib/api';
@@ -11,6 +13,7 @@ const aspectClass: Record<string, string> = { portrait: 'aspect-[4/5]', landscap
 
 export default function GalleryPage() {
   const { isAdmin } = useAuth();
+  const { text } = useContent();
   const [items, setItems] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -73,14 +76,20 @@ export default function GalleryPage() {
     <div className="page-shell py-14 md:py-20">
       <div className="flex flex-col justify-between gap-8 md:flex-row md:items-end">
         <div>
-          <p className="eyebrow"><ImageIcon size={13} /> The visual journal</p>
-          <h1 className="page-title mt-5" style={{ color: 'var(--ink)' }}>A gallery of<br /><em className="font-normal" style={{ color: 'var(--fjord)' }}>quiet moments.</em></h1>
-          <p className="mt-5 max-w-xl leading-relaxed" style={{ color: 'var(--ink-2)' }}>Light, weather, overlooked paths, and the small details worth remembering.</p>
+          <p className="eyebrow"><ImageIcon size={13} /> {text('gallery.eyebrow', 'The visual journal')}</p>
+          <h1 className="page-title mt-5" style={{ color: 'var(--ink)' }}>
+            {text('gallery.title_line_one', 'A gallery of')}<br />
+            <em className="font-normal" style={{ color: 'var(--fjord)' }}>{text('gallery.title_line_two', 'quiet moments.')}</em>
+          </h1>
+          <p className="mt-5 max-w-xl leading-relaxed" style={{ color: 'var(--ink-2)' }}>{text('gallery.intro', 'Light, weather, overlooked paths, and the small details worth remembering.')}</p>
         </div>
         {isAdmin && (
-          <button onClick={() => setManage((v) => !v)} className={manage ? 'btn-primary' : 'btn-outline'}>
-            {manage ? <><Check size={16} /> Viewing manager</> : <><UploadCloud size={16} /> Manage media</>}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => setManage((v) => !v)} className={manage ? 'btn-primary' : 'btn-outline'}>
+              {manage ? <><Check size={16} /> Viewing manager</> : <><UploadCloud size={16} /> Quick manage</>}
+            </button>
+            <Link to="/admin/media" className="btn-outline">Full studio</Link>
+          </div>
         )}
       </div>
       <div className="horizon my-10" />
@@ -126,7 +135,7 @@ export default function GalleryPage() {
         </div>
       )}
 
-      {loading ? <LoadingState label="Developing the photographs…" /> : manage && isAdmin ? (
+      {loading ? <LoadingState label={text('gallery.loading', 'Developing the photographs…')} /> : manage && isAdmin ? (
         <div className="overflow-hidden rounded-2xl" style={{ background: 'var(--bg-surface)', boxShadow: 'var(--shadow-md)' }}>
           <div className="hidden grid-cols-[2fr_.8fr_.8fr_.7fr_6rem] gap-4 border-b px-6 py-4 font-mono text-[9px] uppercase tracking-[.16em] md:grid" style={{ borderColor: 'var(--border-soft)', color: 'var(--ink-3)' }}>
             <span>Media</span><span>Size</span><span>Uploaded</span><span>Visibility</span><span className="text-right">Actions</span>
@@ -177,7 +186,7 @@ export default function GalleryPage() {
       ) : (
         <div className="rounded-2xl py-20 text-center" style={{ background: 'var(--bg-surface)' }}>
           <ImageIcon className="mx-auto" style={{ color: 'var(--moss)' }} />
-          <p className="mt-4 font-serif text-2xl" style={{ color: 'var(--ink)' }}>Nothing in this collection yet.</p>
+          <p className="mt-4 font-serif text-2xl" style={{ color: 'var(--ink)' }}>{text('gallery.empty', 'Nothing in this collection yet.')}</p>
         </div>
       )}
 

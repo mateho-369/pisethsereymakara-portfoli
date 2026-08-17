@@ -1,4 +1,4 @@
-import type { Conversation, Favorite, MediaItem, Message, Profile } from '../types';
+import type { AdminUser, Conversation, Favorite, MediaItem, Message, Profile, SettingField, SiteContent } from '../types';
 
 export interface AuthUser {
   id: number;
@@ -6,6 +6,8 @@ export interface AuthUser {
   email: string;
   role: 'admin' | 'visitor';
   avatar_url?: string | null;
+  blocked_at?: string | null;
+  blocked_reason?: string | null;
 }
 
 interface ApiOptions extends Omit<RequestInit, 'body'> { body?: unknown; csrf?: boolean }
@@ -58,14 +60,20 @@ export const api = {
     get: () => request<Profile>('/api/profile', { csrf: false }),
     update: (patch: Partial<Profile>) => request<Profile>('/api/admin/profile', { method: 'PUT', body: patch }),
   },
+  content: {
+    /** Public copy for the whole site, defaults already merged in. */
+    get: () => request<SiteContent>('/api/settings', { csrf: false }),
+  },
   favorites: {
     list: () => request<Favorite[]>('/api/favorites', { csrf: false }),
     create: (favorite: Omit<Favorite, 'id'>) => request<Favorite>('/api/admin/favorites', { method: 'POST', body: favorite }),
     update: (id: number, patch: Partial<Favorite>) => request<Favorite>(`/api/admin/favorites/${id}`, { method: 'PUT', body: patch }),
     remove: (id: number) => request<void>(`/api/admin/favorites/${id}`, { method: 'DELETE' }),
+    reorder: (order: number[]) => request<Favorite[]>('/api/admin/favorites/reorder', { method: 'POST', body: { order } }),
   },
   media: {
     list: (manage = false) => request<MediaItem[]>(manage ? '/api/admin/media' : '/api/media', { csrf: false }),
+    reorder: (order: number[]) => request<MediaItem[]>('/api/admin/media/reorder', { method: 'POST', body: { order } }),
     create: (media: Omit<MediaItem, 'id'>) => request<MediaItem>('/api/admin/media', { method: 'POST', body: media }),
     update: (id: number, patch: Partial<MediaItem>) => request<MediaItem>(`/api/admin/media/${id}`, { method: 'PUT', body: patch }),
     remove: (id: number) => request<void>(`/api/admin/media/${id}`, { method: 'DELETE' }),
@@ -79,13 +87,31 @@ export const api = {
     googleUrl: () => `${API_BASE_URL}/api/auth/google/redirect`,
   },
   conversations: {
-    list: (admin: boolean) => request<Conversation[]>(admin ? '/api/admin/conversations' : '/api/conversations', { csrf: false }),
+    list: (admin: boolean, status: 'open' | 'archived' | 'all' = 'open') =>
+      request<Conversation[]>(admin ? `/api/admin/conversations?status=${status}` : '/api/conversations', { csrf: false }),
     create: () => request<Conversation>('/api/conversations', { method: 'POST', body: {} }),
     markRead: (id: number) => request<Conversation>(`/api/admin/conversations/${id}/read`, { method: 'POST', body: {} }),
+    archive: (id: number) => request<Conversation>(`/api/admin/conversations/${id}/archive`, { method: 'POST', body: {} }),
+    restore: (id: number) => request<Conversation>(`/api/admin/conversations/${id}/restore`, { method: 'POST', body: {} }),
+    remove: (id: number) => request<void>(`/api/admin/conversations/${id}`, { method: 'DELETE' }),
   },
   messages: {
     list: (conversationId: number) => request<Message[]>(`/api/conversations/${conversationId}/messages`, { csrf: false }),
     send: (conversationId: number, body: string, attachment_url: string | null) => request<Message>(`/api/conversations/${conversationId}/messages`, { method: 'POST', body: { body, attachment_url } }),
+    remove: (id: number) => request<Message>(`/api/admin/messages/${id}`, { method: 'DELETE' }),
+  },
+  admin: {
+    settings: {
+      list: () => request<SettingField[]>('/api/admin/settings', { csrf: false }),
+      save: (settings: Record<string, string>) => request<SettingField[]>('/api/admin/settings', { method: 'PUT', body: { settings } }),
+      reset: (key?: string) => request<SettingField[]>('/api/admin/settings/reset', { method: 'POST', body: key ? { key } : {} }),
+    },
+    users: {
+      list: (search = '') => request<AdminUser[]>(`/api/admin/users${search ? `?search=${encodeURIComponent(search)}` : ''}`, { csrf: false }),
+      block: (id: number, reason?: string) => request<Partial<AdminUser>>(`/api/admin/users/${id}/block`, { method: 'POST', body: { reason: reason || null } }),
+      unblock: (id: number) => request<Partial<AdminUser>>(`/api/admin/users/${id}/unblock`, { method: 'POST', body: {} }),
+      remove: (id: number) => request<void>(`/api/admin/users/${id}`, { method: 'DELETE' }),
+    },
   },
   uploads: {
     file: async (file: File, kind: 'media' | 'chat') => {

@@ -1,6 +1,6 @@
 # Production Deployment Guide
 
-This guide deploys the Field Notes stack on a single Linux VM (GCP e2-micro or equivalent). The frontend is served separately via Cloudflare Pages. There is **no WebSocket service** — the chat uses polling.
+This guide deploys the Field Notes stack on a single Linux VM (GCP e2-micro or equivalent). The frontend is served separately by a Cloudflare Worker. There is **no WebSocket service** — the chat uses polling.
 
 ## Prerequisites
 
@@ -91,10 +91,12 @@ cd /home/<you>/personal-portfoli-makara-mateho
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
+The API container intentionally publishes port `8080` on `0.0.0.0` so the Cloudflare Worker can reach it over the public internet. Restrict access to that port with the VM firewall; **do not** change the Compose binding to `127.0.0.1`, or Worker API requests will fail with a 521 response.
+
 This starts **3 services only**: `app` (PHP-FPM), `nginx` (API proxy), `minio` (object storage), and the one-shot `minio-init` (bucket creation).
 
 - MySQL is **not** in the prod Compose file — it lives on Aiven
-- The frontend is **not** in the prod Compose file — deploy it to Cloudflare Pages
+- The frontend is **not** in the prod Compose file — deploy it with the Cloudflare Worker
 - The MinIO console (port 9001) is **not** publicly exposed — access via SSH tunnel:
 
 ```bash
@@ -172,15 +174,16 @@ Obtain TLS certificates:
 sudo certbot --nginx -d api.yourdomain.com -d storage.yourdomain.com
 ```
 
-## Step 7 — Cloudflare Pages (frontend)
+## Step 7 — Cloudflare Worker (frontend)
 
-1. Connect your GitHub repo to Cloudflare Pages
-2. Set build command: `npm run build`
-3. Set output directory: `dist`
-4. Add environment variable: `VITE_API_URL=https://api.yourdomain.com`
-5. Deploy
+The Worker serves the built React SPA and proxies `/api`, `/sanctum`, and `/up` to the VM from the same public origin. Keep `API_PROXY_TARGET` in `wrangler.jsonc` pointed at the VM's public port `8080`, then deploy:
 
-Cloudflare Pages serves the React SPA. All `/api` and `/sanctum` calls go to `https://api.yourdomain.com` via the `VITE_API_URL` env var.
+```bash
+npm run build
+npx wrangler deploy
+```
+
+Do not set `VITE_API_URL`. Browser requests must stay same-origin so Laravel Sanctum's CSRF cookie can be read and returned correctly.
 
 ## DNS records
 
@@ -188,7 +191,9 @@ Cloudflare Pages serves the React SPA. All `/api` and `/sanctum` calls go to `ht
 |---|---|---|
 | `api` | A | `<VM public IP>` |
 | `storage` | A | `<VM public IP>` |
-| `portfolio` | CNAME | `<your-pages-subdomain>.pages.dev` |
+| `portfolio` | Cloudflare-managed | Worker custom domain |
+
+Attach `portfolio.yourdomain.com` to the Worker as a custom domain in the Cloudflare dashboard; Cloudflare manages that DNS record.
 
 ## Updating
 

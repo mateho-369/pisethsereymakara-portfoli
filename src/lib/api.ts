@@ -13,8 +13,6 @@ export interface AuthUser {
 interface ApiOptions extends Omit<RequestInit, 'body'> { body?: unknown; csrf?: boolean }
 interface PresignResponse { upload_url: string; headers: Record<string, string>; key: string; public_url: string }
 
-export const API_BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
-
 function cookie(name: string) {
   const value = document.cookie.split('; ').find((item) => item.startsWith(`${name}=`))?.split('=').slice(1).join('=');
   return value ? decodeURIComponent(value) : '';
@@ -23,7 +21,7 @@ function cookie(name: string) {
 let csrfReady = false;
 async function ensureCsrf() {
   if (csrfReady && cookie('XSRF-TOKEN')) return;
-  const response = await fetch(`${API_BASE_URL}/sanctum/csrf-cookie`, { credentials: 'include' });
+  const response = await fetch('/sanctum/csrf-cookie', { credentials: 'include' });
   if (!response.ok) throw new Error('Could not establish a secure session.');
   csrfReady = true;
 }
@@ -36,7 +34,7 @@ async function request<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const xsrf = cookie('XSRF-TOKEN');
   if (xsrf) headers.set('X-XSRF-TOKEN', xsrf);
   headers.set('Accept', 'application/json');
-  const response = await fetch(`${API_BASE_URL}${path}`, { ...options, method, headers, credentials: 'include', body: options.body === undefined ? undefined : JSON.stringify(options.body) });
+  const response = await fetch(path, { ...options, method, headers, credentials: 'include', body: options.body === undefined ? undefined : JSON.stringify(options.body) });
   if (response.status === 204) return undefined as T;
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -84,7 +82,7 @@ export const api = {
     register: (name: string, email: string, password: string) => request<{ user: AuthUser }>('/api/auth/register', { method: 'POST', body: { name, email, password } }),
     logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
     forgotPassword: (email: string) => request<{ message: string }>('/api/auth/forgot-password', { method: 'POST', body: { email } }),
-    googleUrl: () => `${API_BASE_URL}/api/auth/google/redirect`,
+    googleUrl: () => '/api/auth/google/redirect',
   },
   conversations: {
     list: (admin: boolean, status: 'open' | 'archived' | 'all' = 'open') =>

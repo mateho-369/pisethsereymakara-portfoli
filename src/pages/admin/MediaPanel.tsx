@@ -8,6 +8,7 @@ import { SelectField, Switch, TextField } from '../../components/ui/Field';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 import LoadingState from '../../components/LoadingState';
+import MediaThumbnail from '../../components/MediaThumbnail';
 import type { MediaItem } from '../../types';
 
 const aspectOptions = [
@@ -23,9 +24,10 @@ export default function MediaPanel() {
   const load = useCallback(() => api.media.list(true), []);
   const { data: items, setData, loading, error, reload } = useResource<MediaItem[]>(load, []);
 
-  const { upload, uploading, progress } = useUpload('media');
+  const { upload, uploadMedia, uploading, progress } = useUpload('media');
   const newFileRef = useRef<HTMLInputElement>(null);
   const replaceRef = useRef<HTMLInputElement>(null);
+  const coverRef = useRef<HTMLInputElement>(null);
 
   const [addForm, setAddForm] = useState({ title: '', category: 'Field Notes', description: '' });
   const [chosenFile, setChosenFile] = useState<File | null>(null);
@@ -40,11 +42,11 @@ export default function MediaPanel() {
     const file = chosenFile;
     if (!file || !addForm.title.trim()) return toastError('Add a title and choose an image or video first.');
     try {
-      const uploaded = await upload(file);
+      const uploaded = await uploadMedia(file);
       await api.media.create({
         ...addForm,
         media_type: uploaded.isVideo ? 'video' : 'photo',
-        thumbnail_url: uploaded.url,
+        thumbnail_url: uploaded.thumbnailUrl,
         media_url: uploaded.url,
         size_label: uploaded.sizeLabel,
         aspect_ratio: 'landscape',
@@ -56,7 +58,9 @@ export default function MediaPanel() {
       setChosenFile(null);
       if (newFileRef.current) newFileRef.current.value = '';
       await reload();
-      success('Added to the gallery.');
+      success(uploaded.posterMissing
+        ? 'Added to the gallery, but the browser could not make a video cover. Open Edit to upload a cover image.'
+        : 'Added to the gallery.');
     } catch (err) {
       toastError(err instanceof Error ? err.message : 'The upload did not finish.');
     }
@@ -70,19 +74,38 @@ export default function MediaPanel() {
   const replaceFile = async (file?: File) => {
     if (!file || !editing) return;
     try {
-      const uploaded = await upload(file);
+      const uploaded = await uploadMedia(file);
       setEditing({
         ...editing,
         media_url: uploaded.url,
-        thumbnail_url: uploaded.url,
+        thumbnail_url: uploaded.thumbnailUrl,
         size_label: uploaded.sizeLabel,
         media_type: uploaded.isVideo ? 'video' : 'photo',
       });
-      success('New file ready — save to publish it.');
+      success(uploaded.posterMissing
+        ? 'New video ready, but its cover could not be generated. Upload a cover image, then save your changes.'
+        : 'New file ready — save to publish it.');
     } catch (err) {
       toastError(err instanceof Error ? err.message : 'The replacement did not upload.');
     } finally {
       if (replaceRef.current) replaceRef.current.value = '';
+    }
+  };
+
+  const replaceCover = async (file?: File) => {
+    if (!file || !editing) return;
+    if (!file.type.startsWith('image/')) {
+      toastError('Please choose an image for the video cover.');
+      return;
+    }
+    try {
+      const uploaded = await upload(file);
+      setEditing({ ...editing, thumbnail_url: uploaded.url });
+      success('Cover image ready — save to publish it.');
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : 'The cover image did not upload.');
+    } finally {
+      if (coverRef.current) coverRef.current.value = '';
     }
   };
 
@@ -153,7 +176,7 @@ export default function MediaPanel() {
       <section className="admin-card">
         {items.map((item, index) => (
           <div key={item.id} className="admin-row md:grid-cols-[auto_1fr_auto] md:items-center">
-            <img src={item.thumbnail_url} alt="" className="h-16 w-20 rounded-lg object-cover" />
+            <MediaThumbnail url={item.thumbnail_url} alt="" className="h-16 w-20 rounded-lg object-cover" />
             <div className="min-w-0">
               <p className="font-medium" style={{ color: 'var(--ink)' }}>{item.title}</p>
               <p className="mt-1 font-mono text-[9px] uppercase tracking-[.14em]" style={{ color: 'var(--ink-3)' }}>
@@ -195,11 +218,19 @@ export default function MediaPanel() {
         {editing && (
           <div className="grid gap-4 pb-3 sm:grid-cols-2">
             <div className="sm:col-span-2 flex flex-wrap items-center gap-4">
-              <img src={editing.thumbnail_url} alt="" className="h-24 w-32 rounded-xl object-cover" />
+              <MediaThumbnail url={editing.thumbnail_url} alt="" className="h-24 w-32 rounded-xl object-cover" />
               <input ref={replaceRef} type="file" accept="image/*,video/*" className="hidden" onChange={(event) => replaceFile(event.target.files?.[0])} />
-              <button onClick={() => replaceRef.current?.click()} disabled={uploading} className="btn-outline !py-2.5">
-                {uploading ? <LoaderCircle className="animate-spin" size={15} /> : <UploadCloud size={15} />} Replace file
-              </button>
+              <input ref={coverRef} type="file" accept="image/*" className="hidden" onChange={(event) => replaceCover(event.target.files?.[0])} />
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => replaceRef.current?.click()} disabled={uploading} className="btn-outline !py-2.5">
+                  {uploading ? <LoaderCircle className="animate-spin" size={15} /> : <UploadCloud size={15} />} Replace file
+                </button>
+                {editing.media_type === 'video' && (
+                  <button onClick={() => coverRef.current?.click()} disabled={uploading} className="btn-outline !py-2.5">
+                    <UploadCloud size={15} /> Cover image
+                  </button>
+                )}
+              </div>
             </div>
             <TextField label="Title" value={editing.title} onChange={(title) => setEditing({ ...editing, title })} />
             <TextField label="Category" value={editing.category} onChange={(category) => setEditing({ ...editing, category })} />

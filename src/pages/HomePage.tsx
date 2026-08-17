@@ -4,6 +4,7 @@ import { ArrowDown, ArrowRight, MapPin, Sparkles } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import type { Favorite, MediaItem, Profile } from '../types';
 import LoadingState from '../components/LoadingState';
+import MediaThumbnail from '../components/MediaThumbnail';
 import { useContent } from '../contexts/ContentContext';
 import { api } from '../lib/api';
 import { favoriteIcon } from '../lib/icons';
@@ -136,7 +137,7 @@ export default function HomePage() {
         <div className="grid auto-rows-[180px] grid-cols-2 gap-3 md:auto-rows-[230px] md:grid-cols-4">
           {media.slice(0, 5).map((item, i) => (
             <Link to="/gallery" key={item.id} className={`gallery-preview group ${i === 0 ? 'col-span-2 row-span-2' : i === 3 ? 'col-span-2' : ''}`}>
-              <img src={item.thumbnail_url} alt={item.title} className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.03]" />
+              <MediaThumbnail url={item.thumbnail_url} alt={item.title} className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.03]" />
               <div className="absolute inset-0 bg-gradient-to-t from-[#1A1F18]/70 via-transparent to-transparent opacity-70 transition-opacity group-hover:opacity-90" />
               <div className="absolute bottom-0 left-0 p-4" style={{ color: '#F8F4E9' }}>
                 <span className="font-mono text-[9px] uppercase tracking-[0.16em] opacity-75">{item.category}</span>

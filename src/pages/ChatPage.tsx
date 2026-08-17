@@ -4,6 +4,7 @@ import { Archive, ArchiveRestore, ArrowLeft, Ban, FileText, Inbox, LoaderCircle,
 import { useAuth } from '../contexts/AuthContext';
 import { useContent } from '../contexts/ContentContext';
 import { api } from '../lib/api';
+import { isImageUrl, isVideoUrl } from '../lib/mediaUrl';
 import type { Conversation, Message, Profile } from '../types';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/Toast';
@@ -264,9 +265,15 @@ export default function ChatPage() {
                             {removed && <p className="italic">{text('chat.removed_message', 'This message was removed by the owner.')}</p>}
                             {!removed && msg.body && <p className="whitespace-pre-wrap">{msg.body}</p>}
                             {!removed && msg.attachment_url && (
-                              <a href={msg.attachment_url} target="_blank" rel="noreferrer" className="mt-2 flex items-center gap-2 rounded-lg p-2 text-sm underline" style={{ background: 'var(--bg-muted)' }}>
-                                <FileText size={16} /> View attachment
-                              </a>
+                              isImageUrl(msg.attachment_url) ? (
+                                <img src={msg.attachment_url} alt="Message attachment" loading="lazy" className="mt-2 max-h-72 w-full rounded-lg object-contain" style={{ background: 'var(--bg-muted)' }} />
+                              ) : isVideoUrl(msg.attachment_url) ? (
+                                <video src={msg.attachment_url} controls playsInline preload="metadata" className="mt-2 max-h-72 w-full rounded-lg" style={{ background: 'var(--bg-muted)' }} />
+                              ) : (
+                                <a href={msg.attachment_url} target="_blank" rel="noreferrer" className="mt-2 flex items-center gap-2 rounded-lg p-2 text-sm underline" style={{ background: 'var(--bg-muted)' }}>
+                                  <FileText size={16} /> View attachment
+                                </a>
+                              )
                             )}
                           </div>
                           <time className="mt-1.5 block px-1 font-mono text-[8px] uppercase tracking-[.1em]" style={{ color: 'var(--ink-4)' }}>

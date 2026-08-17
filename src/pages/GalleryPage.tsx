@@ -6,7 +6,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { useContent } from '../contexts/ContentContext';
 import type { MediaItem } from '../types';
 import LoadingState from '../components/LoadingState';
+import MediaThumbnail from '../components/MediaThumbnail';
 import { api } from '../lib/api';
+import { useUpload } from '../lib/useUpload';
 
 const filters = ['All', 'Photos', 'Videos', 'Favorites'] as const;
 const aspectClass: Record<string, string> = { portrait: 'aspect-[4/5]', landscape: 'aspect-[4/3]', square: 'aspect-square' };
@@ -20,10 +22,9 @@ export default function GalleryPage() {
   const [filter, setFilter] = useState<typeof filters[number]>('All');
   const [selected, setSelected] = useState<MediaItem | null>(null);
   const [manage, setManage] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [form, setForm] = useState({ title: '', description: '', category: 'Field Notes' });
   const fileRef = useRef<HTMLInputElement>(null);
+  const { uploadMedia, uploading, progress } = useUpload('media');
 
   const fetchMedia = useCallback(async () => {
     setError('');
@@ -45,19 +46,15 @@ export default function GalleryPage() {
   const upload = async () => {
     const file = fileRef.current?.files?.[0];
     if (!file || !form.title.trim()) return setError('Add a title and choose an image or video first.');
-    if (file.size > 4 * 1024 * 1024) return setError('Please choose a file smaller than 4 MB.');
-    setUploading(true); setProgress(18); setError('');
+    setError('');
     try {
-      setProgress(36);
-      const uploaded = await api.uploads.file(file, 'media');
-      setProgress(76);
-      const sizeLabel = file.size > 1048576 ? `${(file.size / 1048576).toFixed(1)} MB` : `${Math.ceil(file.size / 1024)} KB`;
-      await api.media.create({ ...form, media_type: file.type.startsWith('video/') ? 'video' : 'photo', thumbnail_url: uploaded.url, media_url: uploaded.url, size_label: sizeLabel, aspect_ratio: 'landscape', captured_at: new Date().toISOString(), is_favorite: false, is_public: true });
-      setProgress(100); setForm({ title: '', description: '', category: 'Field Notes' });
+      const uploaded = await uploadMedia(file);
+      await api.media.create({ ...form, media_type: uploaded.isVideo ? 'video' : 'photo', thumbnail_url: uploaded.thumbnailUrl, media_url: uploaded.url, size_label: uploaded.sizeLabel, aspect_ratio: 'landscape', captured_at: new Date().toISOString(), is_favorite: false, is_public: true });
+      setForm({ title: '', description: '', category: 'Field Notes' });
       if (fileRef.current) fileRef.current.value = '';
       await fetchMedia();
+      if (uploaded.posterMissing) setError('The video was added, but its cover could not be generated. Use Full studio to upload a cover image.');
     } catch (err) { setError(err instanceof Error ? err.message : 'Upload failed.'); }
-    finally { setTimeout(() => { setUploading(false); setProgress(0); }, 450); }
   };
 
   const updateMedia = async (id: number, patch: Partial<MediaItem>) => {
@@ -143,7 +140,7 @@ export default function GalleryPage() {
           {items.map((item) => (
             <div key={item.id} className="grid gap-4 border-b p-4 last:border-0 md:grid-cols-[2fr_.8fr_.8fr_.7fr_6rem] md:items-center md:px-6" style={{ borderColor: 'var(--border-soft)' }}>
               <div className="flex items-center gap-4">
-                <img src={item.thumbnail_url} alt="" className="h-14 w-16 rounded-lg object-cover" />
+                <MediaThumbnail url={item.thumbnail_url} alt="" className="h-14 w-16 rounded-lg object-cover" />
                 <div>
                   <p className="font-medium" style={{ color: 'var(--ink)' }}>{item.title}</p>
                   <p className="mt-1 font-mono text-[9px] uppercase tracking-wider" style={{ color: 'var(--ink-3)' }}>{item.category} · {item.media_type}</p>
@@ -168,7 +165,7 @@ export default function GalleryPage() {
           {filtered.map((item) => (
             <motion.button layout key={item.id} onClick={() => setSelected(item)} className="gallery-card group mb-4 w-full break-inside-avoid text-left">
               <div className={`relative overflow-hidden ${aspectClass[item.aspect_ratio] || 'aspect-[4/3]'}`}>
-                <img src={item.thumbnail_url} alt={item.title} loading="lazy" className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.025]" />
+                <MediaThumbnail url={item.thumbnail_url} alt={item.title} loading="lazy" className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.025]" />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#1A1F18]/75 via-transparent to-transparent opacity-40 transition group-hover:opacity-80" />
                 {item.media_type === 'video' && (
                   <span className="absolute left-4 top-4 grid h-10 w-10 place-items-center rounded-full backdrop-blur" style={{ background: 'rgba(248,244,233,.9)', color: 'var(--ink)' }}>

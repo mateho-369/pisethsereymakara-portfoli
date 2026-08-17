@@ -1,18 +1,19 @@
 import { useEffect, useState } from 'react';
-import { Github, Instagram, LogOut, Mail, Menu, MessageCircle, X } from 'lucide-react';
+import { LayoutDashboard, LogOut, Menu, MessageCircle, X } from 'lucide-react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useContent } from '../contexts/ContentContext';
 import { api } from '../lib/api';
+import { socialIcon } from '../lib/icons';
 import type { Profile } from '../types';
 import Logo from './Logo';
 import ThemeToggle from './ThemeToggle';
-
-const iconFor = (name: string) => name === 'github' ? Github : name === 'instagram' ? Instagram : Mail;
 
 export default function Layout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const { user, isAdmin, signOut } = useAuth();
+  const { text } = useContent();
   const location = useLocation();
 
   useEffect(() => {
@@ -35,17 +36,22 @@ export default function Layout() {
           <Logo />
 
           <nav className="hidden items-center gap-8 md:flex" aria-label="Main navigation">
-            <NavLink to="/" className={navClass} end>Home</NavLink>
-            <NavLink to="/gallery" className={navClass}>Gallery</NavLink>
-            <Link to="/#favorites" className="nav-link">Favorites</Link>
+            <NavLink to="/" className={navClass} end>{text('nav.home', 'Home')}</NavLink>
+            <NavLink to="/gallery" className={navClass}>{text('nav.gallery', 'Gallery')}</NavLink>
+            <Link to="/#favorites" className="nav-link">{text('nav.favorites', 'Favorites')}</Link>
           </nav>
 
           <div className="hidden items-center gap-2 md:flex">
             <ThemeToggle />
             {user ? (
               <>
+                {isAdmin && (
+                  <Link to="/admin" className="btn-outline !px-4 !py-2.5" title="Studio">
+                    <LayoutDashboard size={16} />Studio
+                  </Link>
+                )}
                 <Link to="/chat" className="btn-outline !px-4 !py-2.5">
-                  <MessageCircle size={16} />{isAdmin ? 'Inbox' : 'Messages'}
+                  <MessageCircle size={16} />{isAdmin ? text('nav.inbox', 'Inbox') : text('nav.messages', 'Messages')}
                 </Link>
                 <button onClick={signOut} className="icon-button" aria-label="Sign out">
                   <LogOut size={17} />
@@ -53,8 +59,8 @@ export default function Layout() {
               </>
             ) : (
               <>
-                <Link to="/login" className="nav-link">Sign in</Link>
-                <Link to="/signup" className="btn-primary !px-5 !py-2.5">Say hello</Link>
+                <Link to="/login" className="nav-link">{text('nav.sign_in', 'Sign in')}</Link>
+                <Link to="/signup" className="btn-primary !px-5 !py-2.5">{text('nav.sign_up', 'Say hello')}</Link>
               </>
             )}
           </div>
@@ -77,18 +83,19 @@ export default function Layout() {
             style={{ borderTop: '1px solid var(--border-soft)', background: 'var(--bg-surface)' }}
           >
             <nav className="flex flex-col gap-1">
-              <NavLink to="/" className="mobile-nav-link">Home</NavLink>
-              <NavLink to="/gallery" className="mobile-nav-link">Gallery</NavLink>
-              <Link to="/#favorites" className="mobile-nav-link">Favorites</Link>
+              <NavLink to="/" className="mobile-nav-link">{text('nav.home', 'Home')}</NavLink>
+              <NavLink to="/gallery" className="mobile-nav-link">{text('nav.gallery', 'Gallery')}</NavLink>
+              <Link to="/#favorites" className="mobile-nav-link">{text('nav.favorites', 'Favorites')}</Link>
               {user ? (
                 <>
-                  <NavLink to="/chat" className="mobile-nav-link">{isAdmin ? 'Inbox' : 'Messages'}</NavLink>
+                  {isAdmin && <NavLink to="/admin" className="mobile-nav-link">Studio</NavLink>}
+                  <NavLink to="/chat" className="mobile-nav-link">{isAdmin ? text('nav.inbox', 'Inbox') : text('nav.messages', 'Messages')}</NavLink>
                   <button onClick={signOut} className="mobile-nav-link text-left">Sign out</button>
                 </>
               ) : (
                 <>
-                  <NavLink to="/login" className="mobile-nav-link">Sign in</NavLink>
-                  <NavLink to="/signup" className="btn-primary mt-3 justify-center">Say hello</NavLink>
+                  <NavLink to="/login" className="mobile-nav-link">{text('nav.sign_in', 'Sign in')}</NavLink>
+                  <NavLink to="/signup" className="btn-primary mt-3 justify-center">{text('nav.sign_up', 'Say hello')}</NavLink>
                 </>
               )}
             </nav>
@@ -104,12 +111,14 @@ export default function Layout() {
       >
         <div className="mx-auto flex max-w-[1240px] flex-col items-center justify-between gap-5 px-5 py-10 text-center sm:flex-row sm:px-8 sm:text-left">
           <div>
-            <p className="font-serif text-lg" style={{ color: 'var(--ink)' }}>Made slowly, shared warmly.</p>
-            <p className="mt-1 text-sm" style={{ color: 'var(--ink-3)' }}>© {new Date().getFullYear()} {profile?.display_name || 'Field Notes'}</p>
+            <p className="font-serif text-lg" style={{ color: 'var(--ink)' }}>{text('footer.tagline', 'Made slowly, shared warmly.')}</p>
+            <p className="mt-1 text-sm" style={{ color: 'var(--ink-3)' }}>
+              © {new Date().getFullYear()} {profile?.display_name || text('brand.name', 'Field Notes')} {text('footer.copyright_suffix', '')}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             {profile && Object.entries(profile.social_links || {}).map(([name, url]) => {
-              const Icon = iconFor(name);
+              const Icon = socialIcon(name);
               return <a key={name} href={url} target="_blank" rel="noreferrer" className="icon-button" aria-label={name}><Icon size={17} /></a>;
             })}
           </div>

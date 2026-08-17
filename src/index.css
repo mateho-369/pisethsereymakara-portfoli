@@ -147,6 +147,20 @@ button:disabled { cursor: default; }
 .dark .message-mine   { background: rgba(92,122,137,.25); }
 .dark .message-theirs { background: rgba(217,164,65,.20); }
 
+/* ─── Studio (owner dashboard) ───────────────────────────────────────────── */
+.admin-tab { display: inline-flex; flex-shrink: 0; align-items: center; gap: .55rem; border-radius: .8rem; padding: .65rem .85rem; font-size: .85rem; color: var(--ink-2); border: 1px solid transparent; }
+.admin-tab:hover { background: var(--border-soft); color: var(--ink); }
+.admin-tab-active { background: var(--bg-surface); border-color: var(--border-soft); color: var(--ink); box-shadow: var(--shadow-sm); }
+.admin-card { border: 1px solid var(--border-soft); border-radius: 1.25rem; background: var(--bg-surface); padding: 1.35rem; box-shadow: var(--shadow-md); }
+.admin-row { display: grid; gap: 1rem; border-bottom: 1px solid var(--border-soft); padding: 1rem 0; }
+.admin-row:last-child { border-bottom: 0; }
+.admin-chip { display: inline-flex; align-items: center; gap: .35rem; border-radius: 999px; padding: .3rem .6rem; font-family: 'JetBrains Mono', monospace; font-size: .6rem; letter-spacing: .12em; text-transform: uppercase; }
+.icon-choice { display: grid; height: 2.6rem; width: 2.6rem; place-items: center; border-radius: .7rem; border: 1px solid var(--border-soft); background: var(--bg); color: var(--ink-3); }
+.icon-choice:hover { border-color: var(--moss); color: var(--ink); }
+.icon-choice-active { border-color: transparent; background: var(--moss); color: #F8F4E9; }
+.danger-button { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; border-radius: 999px; padding: .6rem 1rem; font-size: .82rem; font-weight: 600; color: #F8F4E9; background: #A4523C; }
+.danger-button:hover { background: #8E4632; }
+
 /* ─── Animation ──────────────────────────────────────────────────────────── */
 @keyframes gentle-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(4px); } }
 .animate-gentle-bob { animation: gentle-bob 2.2s ease-in-out infinite; }

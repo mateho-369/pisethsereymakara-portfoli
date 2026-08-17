@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { ArrowRight, CircleUserRound, Eye, EyeOff, Leaf } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useContent } from '../contexts/ContentContext';
 import { signInWithGoogle } from '../lib/googleAuth';
 import { api } from '../lib/api';
 
@@ -13,6 +14,7 @@ export default function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const { user, refresh } = useAuth();
+  const { text } = useContent();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -52,12 +54,14 @@ export default function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
           {isSignup ? <Leaf size={21} /> : <CircleUserRound size={21} />}
         </span>
 
-        <p className="eyebrow mt-7">{isSignup ? 'Come in, stay awhile' : 'Good to see you again'}</p>
+        <p className="eyebrow mt-7">
+          {isSignup ? text('auth.signup.eyebrow', 'Come in, stay awhile') : text('auth.signin.eyebrow', 'Good to see you again')}
+        </p>
         <h1 className="mt-3 font-serif text-4xl tracking-tight sm:text-5xl" style={{ color: 'var(--ink)' }}>
-          {isSignup ? 'Say hello' : 'Welcome back'}
+          {isSignup ? text('auth.signup.title', 'Say hello') : text('auth.signin.title', 'Welcome back')}
         </h1>
         <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--ink-3)' }}>
-          {isSignup ? 'Create an account to chat and follow along.' : 'Sign in to continue your quiet conversation.'}
+          {isSignup ? text('auth.signup.body', 'Create an account to chat and follow along.') : text('auth.signin.body', 'Sign in to continue your quiet conversation.')}
         </p>
 
         <form onSubmit={submit} className="mt-8 space-y-5">

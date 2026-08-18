@@ -68,6 +68,9 @@ Use `up -d`, never `docker compose restart app` — `restart` does not reload `e
 ## Production deployment on a VM
 
 See the full step-by-step in [docs/production.md](docs/production.md).
+Rate limiting, upload enforcement and the required `TRUSTED_PROXIES` setting
+are documented in [docs/security.md](docs/security.md) — read it before
+deploying, as IP-based rate limiting is ineffective without that value.
 
 Short version:
 1. Create a free **Aiven MySQL** service at aiven.io

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\PortfolioConversation;
 use App\Models\PortfolioMessage;
 use App\Support\MediaStorage;
+use App\Support\UploadGuard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -29,6 +30,10 @@ class MessageController extends Controller
             'body' => ['nullable', 'string', 'max:3000', 'required_without:attachment_url'],
             'attachment_url' => ['nullable', 'url', 'max:2000', 'required_without:body'],
         ]);
+        // Chat attachments go through the same presigned PUT, so the claimed
+        // size is equally untrustworthy; confirm it against storage.
+        UploadGuard::verifyUrl($validated['attachment_url'] ?? null, 'attachment_url');
+
         $isAdmin = $request->user()->isAdmin();
         $message = PortfolioMessage::create([
             'conversation_id' => $conversation->id,

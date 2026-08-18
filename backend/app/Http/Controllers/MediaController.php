@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PortfolioMedia;
 use App\Support\MediaStorage;
+use App\Support\UploadGuard;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,7 +26,7 @@ class MediaController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $media = PortfolioMedia::create($request->validate([
+        $validated = $request->validate([
             'title' => ['required', 'string', 'max:160'],
             'description' => ['nullable', 'string', 'max:2000'],
             'media_type' => ['required', 'in:photo,video'],
@@ -38,9 +39,17 @@ class MediaController extends Controller
             'is_favorite' => ['required', 'boolean'],
             'is_public' => ['required', 'boolean'],
             'sort_order' => ['sometimes', 'integer', 'min:0'],
-        ]));
+        ]);
 
-        return response()->json($media, 201);
+        // Presigned PUTs cannot cap size, so verify the real bytes in storage
+        // before we keep a row pointing at them.
+        $bytes = UploadGuard::verifyUrl($validated['media_url'], 'media_url');
+        if ($validated['thumbnail_url'] !== $validated['media_url']) {
+            UploadGuard::verifyUrl($validated['thumbnail_url'], 'thumbnail_url');
+        }
+        $validated['size_label'] = UploadGuard::sizeLabel($bytes) ?? $validated['size_label'];
+
+        return response()->json(PortfolioMedia::create($validated), 201);
     }
 
     /**
@@ -63,6 +72,17 @@ class MediaController extends Controller
             'is_public' => ['sometimes', 'boolean'],
             'sort_order' => ['sometimes', 'integer', 'min:0'],
         ]);
+
+        // Verify any newly swapped-in file, same as on create.
+        if (array_key_exists('media_url', $validated) && $validated['media_url'] !== $media->media_url) {
+            $bytes = UploadGuard::verifyUrl($validated['media_url'], 'media_url');
+            $validated['size_label'] = UploadGuard::sizeLabel($bytes) ?? ($validated['size_label'] ?? $media->size_label);
+        }
+        if (array_key_exists('thumbnail_url', $validated)
+            && $validated['thumbnail_url'] !== $media->thumbnail_url
+            && $validated['thumbnail_url'] !== ($validated['media_url'] ?? null)) {
+            UploadGuard::verifyUrl($validated['thumbnail_url'], 'thumbnail_url');
+        }
 
         $replaced = array_filter([
             array_key_exists('media_url', $validated) && $validated['media_url'] !== $media->media_url ? $media->media_url : null,

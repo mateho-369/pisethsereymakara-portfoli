@@ -1,6 +1,7 @@
 import { api } from './api';
 
-export function signInWithGoogle() {
-  window.location.assign(api.auth.googleUrl());
+/** `returnTo` is a path on this site, e.g. `/ask/my-poll`. */
+export function signInWithGoogle(returnTo?: string) {
+  window.location.assign(api.auth.googleUrl(returnTo));
   return true;
 }

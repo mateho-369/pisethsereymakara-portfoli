@@ -124,7 +124,9 @@ services:
     command: >-
       mc alias set local http://minio:9000 fieldnotes local-minio-password &&
       mc mb --ignore-existing local/portfolio &&
-      mc anonymous set download local/portfolio
+      mc anonymous set download local/portfolio/media &&
+      mc anonymous set download local/portfolio/chat &&
+      mc anonymous set none local/portfolio/campaigns
 
 volumes:
   mysql-data:

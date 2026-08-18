@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Heart, Image, Inbox, Type, Users } from 'lucide-react';
+import { ArrowRight, Heart, Image, Inbox, Megaphone, Type, Users } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useResource } from '../../lib/useResource';
 import LoadingState from '../../components/LoadingState';
@@ -9,28 +9,32 @@ interface Stat { label: string; value: string; to: string; hint: string; Icon: t
 
 export default function OverviewPanel() {
   const load = useCallback(async () => {
-    const [media, favorites, users, conversations] = await Promise.all([
+    const [media, favorites, users, conversations, campaigns] = await Promise.all([
       api.media.list(true),
       api.favorites.list(),
       api.admin.users.list(),
       api.conversations.list(true, 'all'),
+      api.admin.campaigns.list(),
     ]);
-    return { media, favorites, users, conversations };
+    return { media, favorites, users, conversations, campaigns };
   }, []);
 
-  const { data, loading, error } = useResource(load, { media: [], favorites: [], users: [], conversations: [] });
+  const { data, loading, error } = useResource(load, { media: [], favorites: [], users: [], conversations: [], campaigns: [] });
 
   if (loading) return <LoadingState label="Opening the studio…" />;
   if (error) return <div className="admin-card" style={{ color: 'var(--gold-deep)' }}>{error}</div>;
 
   const unread = data.conversations.reduce((sum, c) => sum + c.unread_count, 0);
   const blocked = data.users.filter((u) => u.blocked_at).length;
+  const openCampaigns = data.campaigns.filter((c) => c.is_open).length;
+  const awaitingPhotos = data.campaigns.reduce((sum, c) => sum + c.pending_photo_count, 0);
 
   const stats: Stat[] = [
     { label: 'Photographs & films', value: String(data.media.length), to: '/admin/media', hint: `${data.media.filter((m) => !m.is_public).length} private`, Icon: Image },
     { label: 'Things I love', value: String(data.favorites.length), to: '/admin/favorites', hint: 'Cards on the home page', Icon: Heart },
     { label: 'People', value: String(data.users.filter((u) => u.role !== 'admin').length), to: '/admin/people', hint: `${blocked} paused`, Icon: Users },
     { label: 'Conversations', value: String(data.conversations.length), to: '/chat', hint: `${unread} unread`, Icon: Inbox },
+    { label: 'Campaigns', value: String(data.campaigns.length), to: '/admin/campaigns', hint: `${openCampaigns} open · ${awaitingPhotos} photos to review`, Icon: Megaphone },
   ];
 
   return (
@@ -54,6 +58,7 @@ export default function OverviewPanel() {
           <li><Link className="text-link" to="/admin/profile">Profile <ArrowRight size={14} /></Link> — your name, bio, quote, portrait and links.</li>
           <li><Link className="text-link" to="/admin/content">Site text <ArrowRight size={14} /></Link> — every heading, button and paragraph on the site.</li>
           <li><Link className="text-link" to="/admin/media">Media <ArrowRight size={14} /></Link> — add, edit, replace, reorder or hide gallery pieces.</li>
+          <li><Link className="text-link" to="/admin/campaigns">Campaigns <ArrowRight size={14} /></Link> — shareable /ask links for polls, questions and private photo requests.</li>
           <li><Link className="text-link" to="/chat">Inbox <ArrowRight size={14} /></Link> — reply, remove messages, archive threads and pause a visitor.</li>
         </ul>
       </div>

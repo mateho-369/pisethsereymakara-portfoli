@@ -91,3 +91,151 @@ export interface AdminUser {
   message_count: number;
   last_message_at: string | null;
 }
+
+/* ── Campaigns ──────────────────────────────────────────────────────────────
+ * Shareable /ask/{slug} links. Separate from the gallery: nothing submitted
+ * here reaches portfolio media unless the owner explicitly publishes it.
+ */
+
+export type CampaignType = 'poll' | 'question' | 'photo';
+export type CampaignStatus = 'draft' | 'active' | 'closed';
+/** Why a campaign is (not) accepting responses, decided by the server. */
+export type CampaignState = 'draft' | 'scheduled' | 'open' | 'ended' | 'closed';
+export type PollResultsVisibility = 'after_vote' | 'always' | 'after_close';
+export type ModerationStatus = 'pending' | 'approved' | 'rejected';
+
+export interface CampaignOption {
+  id: number;
+  label: string;
+  sort_order?: number;
+}
+
+export interface CampaignTallyOption {
+  id: number;
+  label: string;
+  votes: number;
+  percent: number;
+}
+
+export interface CampaignTally {
+  total: number;
+  options: CampaignTallyOption[];
+}
+
+/** The visitor's own submission — never anyone else's. */
+export interface MyCampaignResponse {
+  id: number;
+  poll_option_id: number | null;
+  answer_text: string | null;
+  photo_url: string | null;
+  moderation_status: ModerationStatus;
+  referral_source: string | null;
+  declared_name: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface PublicCampaign {
+  slug: string;
+  type: CampaignType;
+  title: string;
+  prompt: string | null;
+  state: CampaignState;
+  is_open: boolean;
+  start_date: string | null;
+  end_date: string | null;
+  allow_updates: boolean;
+  ask_referral: boolean;
+  referral_sources: string[];
+  options: CampaignOption[];
+  my_response: MyCampaignResponse | null;
+  is_blocked: boolean;
+  results: CampaignTally | null;
+  response_count: number | null;
+}
+
+export interface AdminCampaign {
+  id: number;
+  slug: string;
+  type: CampaignType;
+  title: string;
+  prompt: string | null;
+  status: CampaignStatus;
+  state: CampaignState;
+  is_open: boolean;
+  start_date: string | null;
+  end_date: string | null;
+  poll_results_visibility: PollResultsVisibility;
+  allow_updates: boolean;
+  ask_referral: boolean;
+  response_count: number;
+  pending_photo_count: number;
+  options: CampaignOption[];
+  created_at: string | null;
+}
+
+/** Owner view of a response, including the identity from their login. */
+export interface AdminCampaignResponse {
+  id: number;
+  user_id: number;
+  name: string;
+  email: string | null;
+  avatar_url: string | null;
+  poll_option_id: number | null;
+  poll_option_label: string | null;
+  answer_text: string | null;
+  photo_url: string | null;
+  photo_size_label: string | null;
+  moderation_status: ModerationStatus;
+  published_media_id: number | null;
+  referral_source: string | null;
+  declared_name: string | null;
+  site_blocked: boolean;
+  campaign_blocked: boolean;
+  created_at: string | null;
+}
+
+export interface AdminCampaignResponses {
+  campaign: AdminCampaign;
+  tally: CampaignTally | null;
+  responses: AdminCampaignResponse[];
+}
+
+export interface CampaignBlock {
+  id: number;
+  user_id: number;
+  name: string;
+  email: string | null;
+  avatar_url: string | null;
+  campaign_id: number | null;
+  campaign_title: string | null;
+  reason: string | null;
+  created_at: string | null;
+}
+
+export interface CampaignInput {
+  type: CampaignType;
+  title: string;
+  prompt?: string | null;
+  status?: CampaignStatus;
+  slug?: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  poll_results_visibility?: PollResultsVisibility;
+  allow_updates?: boolean;
+  ask_referral?: boolean;
+  options?: string[];
+}
+
+export interface CampaignUpdateInput extends Partial<Omit<CampaignInput, 'type' | 'options'>> {
+  options?: { id?: number; label: string }[];
+}
+
+export interface CampaignResponseInput {
+  poll_option_id?: number;
+  answer_text?: string;
+  photo_key?: string;
+  photo_size_label?: string;
+  referral_source?: string | null;
+  declared_name?: string | null;
+}

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\CampaignPhotoStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -19,7 +20,22 @@ class UploadController extends Controller
         return $this->presign($request, 'chat/'.$request->user()->id);
     }
 
-    private function presign(Request $request, string $folder): JsonResponse
+    /**
+     * Campaign photo submissions reuse the exact same presigned browser → MinIO
+     * flow, but land under the private `campaigns/` prefix and only return the
+     * object key: no public URL is ever handed back for these.
+     */
+    public function campaign(Request $request): JsonResponse
+    {
+        return $this->presign(
+            $request,
+            CampaignPhotoStorage::PREFIX.'/'.$request->user()->id,
+            ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+            false,
+        );
+    }
+
+    private function presign(Request $request, string $folder, ?array $allowedTypes = null, bool $exposePublicUrl = true): JsonResponse
     {
         $validated = $request->validate([
             'file_name' => ['required', 'string', 'max:255'],
@@ -27,7 +43,7 @@ class UploadController extends Controller
             'size' => ['required', 'integer', 'min:1', 'max:4194304'],
         ]);
 
-        $allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/webm', 'application/pdf', 'text/plain'];
+        $allowed = $allowedTypes ?? ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/webm', 'application/pdf', 'text/plain'];
         abort_unless(in_array($validated['content_type'], $allowed, true), 422, 'Unsupported file type.');
 
         $extension = strtolower(pathinfo($validated['file_name'], PATHINFO_EXTENSION));
@@ -40,7 +56,7 @@ class UploadController extends Controller
             'upload_url' => $signed['url'],
             'headers' => $signed['headers'] ?? ['Content-Type' => $validated['content_type']],
             'key' => $key,
-            'public_url' => $publicUrl,
+            'public_url' => $exposePublicUrl ? $publicUrl : null,
         ]);
     }
 }

@@ -13,7 +13,7 @@ export default function Layout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const { user, isAdmin, signOut } = useAuth();
-  const { text } = useContent();
+  const { text, activeTheme, seasonalGreeting } = useContent();
   const location = useLocation();
 
   useEffect(() => {
@@ -34,6 +34,10 @@ export default function Layout() {
       >
         <div className="mx-auto flex h-[76px] max-w-[1240px] items-center justify-between px-5 sm:px-8">
           <Logo />
+
+          {activeTheme !== 'default' && seasonalGreeting && (
+            <span className="seasonal-greeting hidden sm:inline-flex">{seasonalGreeting}</span>
+          )}
 
           <nav className="hidden items-center gap-8 md:flex" aria-label="Main navigation">
             <NavLink to="/" className={navClass} end>{text('nav.home', 'Home')}</NavLink>

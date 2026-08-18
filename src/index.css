@@ -161,6 +161,132 @@ button:disabled { cursor: default; }
 .danger-button { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; border-radius: 999px; padding: .6rem 1rem; font-size: .82rem; font-weight: 600; color: #F8F4E9; background: #A4523C; }
 .danger-button:hover { background: #8E4632; }
 
+/* ─── Seasonal themes ────────────────────────────────────────────────────── */
+/* Applied via a class on <html>. Overrides a handful of accent tokens and
+   adds small decorative touches without a full redesign. */
+
+/* Christmas */
+.theme-christmas {
+  --gold:        #C0392B;
+  --gold-deep:   #922B21;
+  --gold-pale:   rgba(192,57,43,.12);
+  --fjord:       #27AE60;
+  --moss:        #1E8449;
+  --glow-hero:   rgba(192,57,43,.14);
+}
+.theme-christmas.dark {
+  --gold:        #E74C3C;
+  --gold-deep:   #C0392B;
+  --gold-pale:   rgba(231,76,60,.10);
+  --fjord:       #58D68D;
+  --moss:        #2ECC71;
+  --glow-hero:   rgba(231,76,60,.08);
+}
+
+/* Halloween */
+.theme-halloween {
+  --gold:        #E67E22;
+  --gold-deep:   #CA6F1E;
+  --gold-pale:   rgba(230,126,34,.12);
+  --fjord:       #8E44AD;
+  --moss:        #6C3483;
+  --glow-hero:   rgba(142,68,173,.16);
+  --bg:          #F4ECD8;
+  --bg-surface:  #FBF6EC;
+}
+.theme-halloween.dark {
+  --gold:        #F39C12;
+  --gold-deep:   #E67E22;
+  --gold-pale:   rgba(243,156,18,.10);
+  --fjord:       #BB8FCE;
+  --moss:        #AF7AC5;
+  --glow-hero:   rgba(142,68,173,.10);
+  --bg:          #1C1420;
+  --bg-surface:  #251C2B;
+  --bg-muted:    #2E2336;
+}
+
+/* Khmer New Year (mid-April — warm golds and florals) */
+.theme-khmer-new-year {
+  --gold:        #F1C40F;
+  --gold-deep:   #D4AC0D;
+  --gold-pale:   rgba(241,196,15,.14);
+  --fjord:       #E74C3C;
+  --moss:        #C0392B;
+  --glow-hero:   rgba(241,196,15,.18);
+  --bg:          #FEF9E7;
+  --bg-surface:  #FFFDF2;
+}
+.theme-khmer-new-year.dark {
+  --gold:        #F4D03F;
+  --gold-deep:   #F1C40F;
+  --gold-pale:   rgba(244,208,63,.10);
+  --fjord:       #EC7063;
+  --moss:        #E74C3C;
+  --glow-hero:   rgba(244,208,63,.10);
+}
+
+/* Pchum Ben (Sept/Oct — deep purples and silver) */
+.theme-pchum-ben {
+  --gold:        #7D3C98;
+  --gold-deep:   #6C3483;
+  --gold-pale:   rgba(125,60,152,.12);
+  --fjord:       #5B2C6F;
+  --moss:        #4A235A;
+  --glow-hero:   rgba(125,60,152,.16);
+  --bg:          #F5EEF8;
+  --bg-surface:  #FDF8FF;
+}
+.theme-pchum-ben.dark {
+  --gold:        #A569BD;
+  --gold-deep:   #8E44AD;
+  --gold-pale:   rgba(165,105,189,.10);
+  --fjord:       #D2B4DE;
+  --moss:        #BB8FCE;
+  --glow-hero:   rgba(165,105,189,.08);
+  --bg:          #1A1520;
+  --bg-surface:  #231C2B;
+  --bg-muted:    #2D2436;
+}
+
+/* Bon Om Touk (Water Festival, November — water blues and silver) */
+.theme-bon-om-touk {
+  --gold:        #2980B9;
+  --gold-deep:   #2471A3;
+  --gold-pale:   rgba(41,128,185,.12);
+  --fjord:       #1ABC9C;
+  --moss:        #16A085;
+  --glow-hero:   rgba(41,128,185,.16);
+  --bg:          #EBF5FB;
+  --bg-surface:  #F4FAFE;
+}
+.theme-bon-om-touk.dark {
+  --gold:        #5DADE2;
+  --gold-deep:   #3498DB;
+  --gold-pale:   rgba(93,173,226,.10);
+  --fjord:       #48C9B0;
+  --moss:        #1ABC9C;
+  --glow-hero:   rgba(93,173,226,.08);
+  --bg:          #151E25;
+  --bg-surface:  #1B2630;
+  --bg-muted:    #23303B;
+}
+
+/* Seasonal greeting banner */
+.seasonal-greeting {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .63rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--gold-deep);
+  background: var(--gold-pale);
+  border-radius: 999px;
+  padding: .35rem .7rem;
+}
+
 /* ─── Animation ──────────────────────────────────────────────────────────── */
 @keyframes gentle-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(4px); } }
 .animate-gentle-bob { animation: gentle-bob 2.2s ease-in-out infinite; }

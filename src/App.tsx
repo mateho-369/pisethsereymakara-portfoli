@@ -17,6 +17,7 @@ import MediaPanel from './pages/admin/MediaPanel';
 import OverviewPanel from './pages/admin/OverviewPanel';
 import PeoplePanel from './pages/admin/PeoplePanel';
 import ProfilePanel from './pages/admin/ProfilePanel';
+import StudioPanel from './pages/admin/StudioPanel';
 
 function NotFound() {
   const { text } = useContent();
@@ -51,6 +52,7 @@ export default function App() {
                     <Route path="favorites" element={<FavoritesPanel />} />
                     <Route path="media" element={<MediaPanel />} />
                     <Route path="people" element={<PeoplePanel />} />
+                    <Route path="studio" element={<StudioPanel />} />
                   </Route>
                   <Route path="*" element={<NotFound />} />
                 </Route>

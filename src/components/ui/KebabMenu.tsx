@@ -32,7 +32,7 @@ export default function KebabMenu({ actions, label = 'More actions' }: KebabMenu
     const gutter = 8;
     const left = rect.right + width + gutter <= window.innerWidth
       ? rect.right
-      : Math.max(gutter, rect.left - width);
+      : Math.max(gutter, rect.right - width);
     const top = rect.bottom + height + gutter <= window.innerHeight
       ? rect.bottom + 4
       : Math.max(gutter, rect.top - height - 4);

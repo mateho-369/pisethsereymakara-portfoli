@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api } from '../lib/api';
+import { isParticleIntensity, type ParticleIntensity } from '../lib/particlePresets';
 import type { SiteContent } from '../types';
 
 export const SEASONAL_THEMES = ['default', 'christmas', 'halloween', 'khmer-new-year', 'pchum-ben', 'bon-om-touk'] as const;
@@ -31,6 +32,10 @@ interface ContentValue {
   refresh: () => Promise<void>;
   activeTheme: SeasonalTheme;
   seasonalGreeting: string;
+  /** Whether the ambient particle layer should render for the active theme. */
+  particlesEnabled: boolean;
+  /** How dense that layer is — scales every preset's particle count. */
+  particleIntensity: ParticleIntensity;
 }
 
 const ContentContext = createContext<ContentValue>({
@@ -40,6 +45,8 @@ const ContentContext = createContext<ContentValue>({
   refresh: async () => undefined,
   activeTheme: 'default',
   seasonalGreeting: '',
+  particlesEnabled: true,
+  particleIntensity: 'normal',
 });
 
 /**
@@ -99,6 +106,12 @@ export function ContentProvider({ children }: { children: ReactNode }) {
   const activeTheme = useMemo(() => resolveTheme(content), [content]);
   const seasonalGreeting = content['theme.greeting'] || '';
 
+  // Particles ride alongside the theme settings: same storage, same save button.
+  // Opt-out rather than opt-in, so a theme looks complete the moment it's picked.
+  const particlesEnabled = (content['theme.particles'] ?? 'on') !== 'off';
+  const rawIntensity = content['theme.particle_intensity'] || 'normal';
+  const particleIntensity: ParticleIntensity = isParticleIntensity(rawIntensity) ? rawIntensity : 'normal';
+
   // Apply the seasonal theme class to the root element
   useEffect(() => {
     const root = document.documentElement;
@@ -118,11 +131,13 @@ export function ContentProvider({ children }: { children: ReactNode }) {
     refresh,
     activeTheme,
     seasonalGreeting,
+    particlesEnabled,
+    particleIntensity,
     text: (key: string, fallback = '') => {
       const stored = content[key];
       return stored === undefined || stored === '' ? fallback : stored;
     },
-  }), [content, ready, refresh, activeTheme, seasonalGreeting]);
+  }), [content, ready, refresh, activeTheme, seasonalGreeting, particlesEnabled, particleIntensity]);
 
   useEffect(() => {
     const title = content['meta.title'];

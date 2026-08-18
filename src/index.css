@@ -173,6 +173,11 @@ button:disabled { cursor: default; }
   --fjord:       #27AE60;
   --moss:        #1E8449;
   --glow-hero:   rgba(192,57,43,.14);
+  /* Snow: pure white vanishes on the pale background, so light mode uses a
+     cool blue-grey that still reads as a snowflake. */
+  --ambient-1:   #8FB4D4;
+  --ambient-2:   #A9C6DE;
+  --ambient-3:   #7FA8CC;
 }
 .theme-christmas.dark {
   --gold:        #E74C3C;
@@ -181,6 +186,9 @@ button:disabled { cursor: default; }
   --fjord:       #58D68D;
   --moss:        #2ECC71;
   --glow-hero:   rgba(231,76,60,.08);
+  --ambient-1:   #FFFFFF;
+  --ambient-2:   #E4F1FF;
+  --ambient-3:   #C8E1F7;
 }
 
 /* Halloween */
@@ -193,6 +201,11 @@ button:disabled { cursor: default; }
   --glow-hero:   rgba(142,68,173,.16);
   --bg:          #F4ECD8;
   --bg-surface:  #FBF6EC;
+  --ambient-1:   #4A3A57;   /* bats */
+  --ambient-2:   #5C4470;
+  --ambient-3:   #3B2E46;
+  --ambient-4:   #9C8FB0;   /* ground mist */
+  --ambient-5:   #B4A3C4;
 }
 .theme-halloween.dark {
   --gold:        #F39C12;
@@ -204,6 +217,13 @@ button:disabled { cursor: default; }
   --bg:          #1C1420;
   --bg-surface:  #251C2B;
   --bg-muted:    #2E2336;
+  /* Inverted for dark mode: a bat darker than the night sky is just invisible,
+     so the silhouettes lift to a moonlit purple-grey instead. */
+  --ambient-1:   #6E5786;
+  --ambient-2:   #82699B;
+  --ambient-3:   #5B4870;
+  --ambient-4:   #8E7FA6;
+  --ambient-5:   #A99BC0;
 }
 
 /* Khmer New Year (mid-April — warm golds and florals) */
@@ -216,6 +236,11 @@ button:disabled { cursor: default; }
   --glow-hero:   rgba(241,196,15,.18);
   --bg:          #FEF9E7;
   --bg-surface:  #FFFDF2;
+  /* Rumdul petals — deepened so they don't wash out on the cream background. */
+  --ambient-1:   #E8B84B;
+  --ambient-2:   #DFA23C;
+  --ambient-3:   #E9C46A;
+  --ambient-4:   #D98F3F;
 }
 .theme-khmer-new-year.dark {
   --gold:        #F4D03F;
@@ -224,6 +249,10 @@ button:disabled { cursor: default; }
   --fjord:       #EC7063;
   --moss:        #E74C3C;
   --glow-hero:   rgba(244,208,63,.10);
+  --ambient-1:   #F6E7A8;
+  --ambient-2:   #F2D98B;
+  --ambient-3:   #EFC98F;
+  --ambient-4:   #F7EFD2;
 }
 
 /* Pchum Ben (Sept/Oct — deep purples and silver) */
@@ -236,6 +265,12 @@ button:disabled { cursor: default; }
   --glow-hero:   rgba(125,60,152,.16);
   --bg:          #F5EEF8;
   --bg-surface:  #FDF8FF;
+  /* Kept muted on purpose — this is a day of remembrance, not a celebration. */
+  --ambient-1:   #A98BB5;   /* lotus */
+  --ambient-2:   #B99EC3;
+  --ambient-3:   #9878A6;
+  --ambient-4:   #A99BB4;   /* incense smoke */
+  --ambient-5:   #BBAFC6;
 }
 .theme-pchum-ben.dark {
   --gold:        #A569BD;
@@ -247,6 +282,11 @@ button:disabled { cursor: default; }
   --bg:          #1A1520;
   --bg-surface:  #231C2B;
   --bg-muted:    #2D2436;
+  --ambient-1:   #D9C3DE;
+  --ambient-2:   #E7D3E4;
+  --ambient-3:   #C6AECF;
+  --ambient-4:   #C9BFD2;
+  --ambient-5:   #DCD2E2;
 }
 
 /* Bon Om Touk (Water Festival, November — water blues and silver) */
@@ -259,6 +299,11 @@ button:disabled { cursor: default; }
   --glow-hero:   rgba(41,128,185,.16);
   --bg:          #EBF5FB;
   --bg-surface:  #F4FAFE;
+  /* Lantern lights — saturated so the glow still reads in daylight. */
+  --ambient-1:   #E8A63C;
+  --ambient-2:   #DE8F2E;
+  --ambient-3:   #EFBB63;
+  --ambient-4:   #4FA9C4;
 }
 .theme-bon-om-touk.dark {
   --gold:        #5DADE2;
@@ -270,6 +315,10 @@ button:disabled { cursor: default; }
   --bg:          #151E25;
   --bg-surface:  #1B2630;
   --bg-muted:    #23303B;
+  --ambient-1:   #FFD79A;
+  --ambient-2:   #FFC46B;
+  --ambient-3:   #FFE9C0;
+  --ambient-4:   #9FD8E8;
 }
 
 /* Seasonal greeting banner */
@@ -285,6 +334,126 @@ button:disabled { cursor: default; }
   background: var(--gold-pale);
   border-radius: 999px;
   padding: .35rem .7rem;
+}
+
+/* ─── Ambient seasonal particles ─────────────────────────────────────────── */
+/* The drifting layer behind each seasonal theme (snow, petals, lanterns…).
+   Every particle is three nested nodes so the transforms never fight:
+     .ambient-particle → travel (fall / rise / cross)
+     .ambient-sway     → side-to-side (or up-down) drift
+     .ambient-spin     → slow rotation or a gentle bob
+   All of it is pure CSS driven by per-particle custom properties set inline in
+   AmbientParticles.tsx, which keeps the work on the compositor thread instead
+   of re-rendering ~20 elements per frame from JS. */
+
+.ambient-field {
+  position: fixed;
+  inset: 0;
+  z-index: 30;             /* above the page background, below the header (50) */
+  overflow: hidden;
+  pointer-events: none;    /* never intercepts a click, anywhere in the layer */
+  contain: strict;         /* the field can't trigger layout on the rest of the page */
+}
+
+.ambient-field * { pointer-events: none; }
+
+/* Tab hidden → stop every animation rather than burning battery off-screen. */
+.ambient-field[data-paused='true'] *,
+.ambient-field[data-paused='true'] { animation-play-state: paused !important; }
+
+.ambient-particle {
+  position: absolute;
+  top: 0;
+  left: var(--p-left, 0);
+  will-change: transform, opacity;
+  animation-name: ambient-fall;
+  animation-duration: var(--p-duration, 18s);
+  animation-delay: var(--p-delay, 0s);
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.ambient-particle-rise { animation-name: ambient-rise; }
+
+.ambient-particle-cross {
+  left: 0;
+  top: var(--p-top, 20vh);
+  animation-name: ambient-cross;
+  animation-direction: var(--p-direction, normal);
+}
+
+.ambient-sway {
+  display: block;
+  will-change: transform;
+  animation-duration: var(--p-sway-duration, 6s);
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+.ambient-sway-x { animation-name: ambient-sway-x; }
+.ambient-sway-y { animation-name: ambient-sway-y; }
+
+.ambient-spin { display: block; }
+.ambient-spin.is-spinning {
+  animation: ambient-spin var(--p-spin-duration, 14s) linear infinite;
+}
+.ambient-spin.is-bobbing {
+  animation: ambient-bob var(--p-bob-duration, 2.6s) ease-in-out infinite alternate;
+}
+
+.ambient-shape { display: block; width: var(--p-size, 12px); height: var(--p-size, 12px); }
+.ambient-shape-lantern { border-radius: 999px; }
+.ambient-shape-fog {
+  width: calc(var(--p-size, 120px) * 2.1);
+  height: calc(var(--p-size, 120px) * 0.5);
+  border-radius: 999px;
+}
+.ambient-shape-wisp {
+  width: var(--p-size, 20px);
+  height: calc(var(--p-size, 20px) * 2.8);
+  border-radius: 999px;
+}
+
+/* Travel: fade in on entry and out before exit so nothing pops at the edges. */
+@keyframes ambient-fall {
+  0%   { transform: translate3d(0, -15vh, 0); opacity: 0; }
+  8%   { opacity: var(--p-opacity, .5); }
+  88%  { opacity: var(--p-opacity, .5); }
+  100% { transform: translate3d(0, 112vh, 0); opacity: 0; }
+}
+
+@keyframes ambient-rise {
+  0%   { transform: translate3d(0, 110vh, 0); opacity: 0; }
+  10%  { opacity: var(--p-opacity, .5); }
+  85%  { opacity: var(--p-opacity, .5); }
+  100% { transform: translate3d(0, -18vh, 0); opacity: 0; }
+}
+
+@keyframes ambient-cross {
+  0%   { transform: translate3d(-18vw, 0, 0); opacity: 0; }
+  10%  { opacity: var(--p-opacity, .3); }
+  88%  { opacity: var(--p-opacity, .3); }
+  100% { transform: translate3d(116vw, 0, 0); opacity: 0; }
+}
+
+@keyframes ambient-sway-x {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(var(--p-sway, 20px), 0, 0); }
+}
+
+@keyframes ambient-sway-y {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(0, var(--p-sway, 20px), 0); }
+}
+
+@keyframes ambient-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(var(--p-spin, 360deg)); }
+}
+
+@keyframes ambient-bob {
+  from { transform: translate3d(0, calc(var(--p-bob, 5px) * -1), 0); }
+  to   { transform: translate3d(0, var(--p-bob, 5px), 0); }
 }
 
 /* ─── Animation ──────────────────────────────────────────────────────────── */
@@ -303,4 +472,15 @@ button:disabled { cursor: default; }
   html { scroll-behavior: auto; }
   .animate-gentle-bob { animation: none; }
   button, a { transition-duration: 0ms; }
+
+  /* AmbientParticles already refuses to mount when this is set; this is the
+     belt-and-braces version, so no drifting layer can survive the preference
+     even if it slips through (cached markup, a future caller, etc.). */
+  .ambient-field { display: none; }
+  .ambient-particle, .ambient-sway, .ambient-spin { animation: none !important; }
+}
+
+/* Particles are decoration — never send them to the printer. */
+@media print {
+  .ambient-field { display: none; }
 }

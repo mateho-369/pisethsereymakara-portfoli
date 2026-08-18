@@ -6,6 +6,7 @@ import { useContent } from '../contexts/ContentContext';
 import { api } from '../lib/api';
 import { socialIcon } from '../lib/icons';
 import type { Profile } from '../types';
+import AmbientParticles from './AmbientParticles';
 import Logo from './Logo';
 import ThemeToggle from './ThemeToggle';
 
@@ -25,6 +26,9 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg)', color: 'var(--ink)' }}>
+      {/* Seasonal ambient drift — decorative, click-through, opt-out per theme */}
+      <AmbientParticles />
+
       {/* Rising horizon progress bar */}
       <div className="fixed left-0 top-0 z-[70] h-[2px] w-full bg-gradient-to-r from-[#6E7C52] via-[#D9A441] to-[#5C7A89]" />
 

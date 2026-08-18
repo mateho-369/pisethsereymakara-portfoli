@@ -1,11 +1,12 @@
 import { useCallback, useState } from 'react';
 import { motion } from 'framer-motion';
-import { LoaderCircle, Save, Sparkles } from 'lucide-react';
+import { Accessibility, LoaderCircle, Save, Sparkles, Wind } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useResource } from '../../lib/useResource';
 import { useContent, SEASONAL_THEMES, SEASONAL_THEME_LABELS, SEASONAL_THEME_ICONS, type SeasonalTheme } from '../../contexts/ContentContext';
+import { INTENSITY_LABELS, PARTICLE_INTENSITIES, presetFor } from '../../lib/particlePresets';
 import { useToast } from '../../components/ui/Toast';
-import { TextField } from '../../components/ui/Field';
+import { SelectField, Switch, TextField } from '../../components/ui/Field';
 import LoadingState from '../../components/LoadingState';
 import type { SettingField } from '../../types';
 
@@ -32,11 +33,13 @@ export default function StudioPanel() {
   if (loading) return <LoadingState label="Opening the studio…" />;
   if (error) return <div className="admin-card" style={{ color: 'var(--gold-deep)' }}>{error}</div>;
 
-  const themeKeys = ['theme.active', 'theme.greeting', 'theme.start_date', 'theme.end_date'];
+  const themeKeys = ['theme.active', 'theme.greeting', 'theme.particles', 'theme.particle_intensity', 'theme.start_date', 'theme.end_date'];
   const themeValue = (key: string) => draft[key] ?? '';
   const setThemeValue = (key: string, value: string) => setDraft({ ...draft, [key]: value });
 
   const selectedTheme = (themeValue('theme.active') || 'default') as SeasonalTheme;
+  const selectedPreset = presetFor(selectedTheme);
+  const particlesOn = (themeValue('theme.particles') || 'on') !== 'off';
   const isDirty = themeKeys.some((key) => {
     const field = fields.find((f) => f.key === key);
     return field && (draft[key] ?? '') !== field.value;
@@ -70,7 +73,7 @@ export default function StudioPanel() {
         <div>
           <h2 className="font-serif text-2xl" style={{ color: 'var(--ink)' }}>Seasonal studio</h2>
           <p className="mt-1 text-sm" style={{ color: 'var(--ink-3)' }}>
-            Change the site's mood for special occasions. The theme adjusts accent colours and adds a greeting.
+            Change the site's mood for special occasions. The theme adjusts accent colours, adds a greeting, and drifts a matching ambient layer behind the page.
           </p>
         </div>
         <button onClick={save} disabled={saving || !isDirty} className="btn-primary disabled:opacity-50">
@@ -112,6 +115,51 @@ export default function StudioPanel() {
         </div>
       </section>
 
+      {/* Ambient particles */}
+      <section className="admin-card">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="font-serif text-lg" style={{ color: 'var(--ink)' }}>Ambient drift</h3>
+            <p className="mt-1 text-sm leading-relaxed" style={{ color: 'var(--ink-3)' }}>
+              A slow floating layer that matches the theme — each one is tuned to its own occasion.
+            </p>
+          </div>
+          <span className="admin-chip" style={{ background: 'var(--gold-pale)', color: 'var(--gold-deep)' }}>
+            <Wind size={11} /> {selectedTheme === 'default' ? 'None' : particlesOn ? 'On' : 'Off'}
+          </span>
+        </div>
+
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <Switch
+            label="Show ambient particles"
+            hint="Decorative only — it never blocks clicks."
+            checked={particlesOn}
+            onChange={(checked) => setThemeValue('theme.particles', checked ? 'on' : 'off')}
+          />
+          <SelectField
+            label="Density"
+            value={themeValue('theme.particle_intensity') || 'normal'}
+            onChange={(v) => setThemeValue('theme.particle_intensity', v)}
+            options={PARTICLE_INTENSITIES.map((level) => ({ value: level, label: INTENSITY_LABELS[level] }))}
+            hint="Phones automatically get a lighter field than desktops."
+          />
+        </div>
+
+        <p className="mt-4 rounded-xl px-3.5 py-3 text-sm leading-relaxed" style={{ background: 'var(--bg)', border: '1px solid var(--border-soft)', color: 'var(--ink-2)' }}>
+          {selectedTheme === 'default'
+            ? 'The default theme has no ambient layer — pick a seasonal theme above to add one.'
+            : selectedPreset?.description}
+        </p>
+
+        <p className="mt-3 flex items-start gap-2 text-xs leading-relaxed" style={{ color: 'var(--ink-4)' }}>
+          <Accessibility size={14} className="mt-px shrink-0" />
+          <span>
+            Visitors who turn on “reduce motion” in their system settings never see the particle layer, whatever is
+            chosen here. It also pauses itself when the browser tab isn't visible.
+          </span>
+        </p>
+      </section>
+
       {/* Greeting & scheduling */}
       <section className="admin-card grid gap-4 md:grid-cols-2">
         <div className="md:col-span-2">
@@ -143,7 +191,7 @@ export default function StudioPanel() {
       <section className="admin-card">
         <h3 className="font-serif text-lg" style={{ color: 'var(--ink)' }}>Preview as visitor</h3>
         <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--ink-3)' }}>
-          Changes take effect on the public site as soon as you save. Visit the home page in an incognito window to see exactly what visitors see. The theme adjusts accent colours, the hero glow, and adds your greeting — it does not replace the entire layout.
+          Changes take effect on the public site as soon as you save. Visit the home page in an incognito window to see exactly what visitors see. The theme adjusts accent colours, the hero glow, the ambient drift and your greeting — it does not replace the entire layout.
         </p>
       </section>
     </div>

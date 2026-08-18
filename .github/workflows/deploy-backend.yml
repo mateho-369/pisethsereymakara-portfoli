@@ -1,0 +1,25 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'docker-compose.prod.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          script: |
+            cd ~/pisethsereymakara-portfoli
+            git pull origin main
+            docker compose -p personal-portfoli-makara-mateho -f docker-compose.prod.yml up -d --build --force-recreate app nginx
+            docker compose -p personal-portfoli-makara-mateho -f docker-compose.prod.yml exec -T app php artisan migrate --force

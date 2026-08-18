@@ -99,8 +99,13 @@ export function ContentProvider({ children }: { children: ReactNode }) {
   // Gentle polling: refresh content every 60 seconds so visitors see admin edits
   // without a manual browser refresh. Low frequency to stay kind to the server.
   useEffect(() => {
-    const interval = window.setInterval(refresh, 60_000);
-    return () => window.clearInterval(interval);
+    let interval: number | undefined;
+    const start = () => { if (document.visibilityState !== 'hidden') interval = window.setInterval(refresh, 60_000); };
+    const stop = () => { if (interval) window.clearInterval(interval); interval = undefined; };
+    const onVisibility = () => { stop(); if (document.visibilityState !== 'hidden') { refresh(); start(); } };
+    start();
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => { stop(); document.removeEventListener('visibilitychange', onVisibility); };
   }, [refresh]);
 
   const activeTheme = useMemo(() => resolveTheme(content), [content]);

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Archive, ArchiveRestore, ArrowLeft, Ban, Copy, FileText, Inbox, Link2, LoaderCircle, MessageCircle, Paperclip, Search, Send, ShieldCheck, Trash2 } from 'lucide-react';
+import { Archive, ArchiveRestore, ArrowDown, ArrowLeft, Ban, Copy, FileText, Inbox, Link2, LoaderCircle, MessageCircle, Paperclip, Search, Send, ShieldCheck, Trash2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useContent } from '../contexts/ContentContext';
 import { api } from '../lib/api';
@@ -73,6 +73,12 @@ export default function ChatPage() {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const threadRef = useRef<HTMLDivElement>(null);
+  const initialScrollRef = useRef(false);
+  const forceScrollRef = useRef(false);
+  const handledMessageIdRef = useRef<number | undefined>(undefined);
+  const [nearBottom, setNearBottom] = useState(true);
+  const [unreadBelow, setUnreadBelow] = useState(0);
 
   const attachmentItems = useMemo<LightboxItem[]>(() => {
     return messages
@@ -85,7 +91,10 @@ export default function ChatPage() {
   }, [messages]);
 
   const fetchMessages = useCallback(async (id: number) => {
-    setMessages(await api.messages.list(id));
+    const incoming = await api.messages.list(id);
+    // Polling often returns identical data. Preserve state identity in that case
+    // so message rows do not re-render or replay their entrance animation.
+    setMessages((current) => current.length === incoming.length && current.every((message, index) => message.id === incoming[index].id) ? current : incoming);
   }, []);
 
   const fetchConversations = useCallback(async () => {
@@ -97,22 +106,56 @@ export default function ChatPage() {
         data = [created];
       }
       setConversations(data);
-      setSelected((cur) => cur ? data.find((c: Conversation) => c.id === cur.id) || data[0] || null : data[0] || null);
+      setSelected((cur) => cur ? data.find((c: Conversation) => c.id === cur.id) || null : (isAdmin ? null : data[0] || null));
     } catch (err) { setError(err instanceof Error ? err.message : 'Could not open conversations.'); }
     finally { setLoading(false); }
   }, [isAdmin, user, folder]);
 
   useEffect(() => { api.profile.get().then(setProfile).catch(() => null); fetchConversations(); }, [fetchConversations]);
-  useEffect(() => { if (selected) fetchMessages(selected.id).catch((e) => setError(e.message)); else setMessages([]); }, [selected?.id, fetchMessages]);
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => {
+    if (selected) {
+      initialScrollRef.current = true;
+      fetchMessages(selected.id).catch((e) => setError(e.message));
+    } else setMessages([]);
+  }, [selected?.id, fetchMessages]);
+
+  const scrollToLatest = useCallback((instant = false) => {
+    const thread = threadRef.current;
+    if (!thread) return;
+    thread.scrollTo({ top: thread.scrollHeight, behavior: instant || window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    setUnreadBelow(0);
+    setNearBottom(true);
+  }, []);
+
+  const lastMessageId = messages[messages.length - 1]?.id;
+  useEffect(() => {
+    if (!lastMessageId || handledMessageIdRef.current === lastMessageId) return;
+    handledMessageIdRef.current = lastMessageId;
+    if (initialScrollRef.current) {
+      initialScrollRef.current = false;
+      requestAnimationFrame(() => scrollToLatest(true));
+    } else if (forceScrollRef.current || nearBottom) {
+      forceScrollRef.current = false;
+      requestAnimationFrame(() => scrollToLatest(false));
+    } else {
+      setUnreadBelow((count) => count + 1);
+    }
+  }, [lastMessageId, nearBottom, scrollToLatest]);
 
   useEffect(() => {
     if (!selected) return;
-    const poll = window.setInterval(() => fetchMessages(selected.id).catch(() => null), 6000);
-    return () => window.clearInterval(poll);
+    const refresh = () => fetchMessages(selected.id).catch(() => null);
+    let poll: number | undefined;
+    const startPolling = () => { if (document.visibilityState !== 'hidden') poll = window.setInterval(refresh, 6000); };
+    const stopPolling = () => { if (poll) window.clearInterval(poll); poll = undefined; };
+    const onVisibility = () => { stopPolling(); if (document.visibilityState !== 'hidden') { refresh(); startPolling(); } };
+    startPolling();
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => { stopPolling(); document.removeEventListener('visibilitychange', onVisibility); };
   }, [selected?.id, fetchMessages]);
 
   const chooseConversation = async (c: Conversation) => {
+    setUnreadBelow(0);
     setSelected(c);
     if (isAdmin && c.unread_count > 0) { await api.conversations.markRead(c.id); fetchConversations(); }
   };
@@ -177,6 +220,7 @@ export default function ChatPage() {
     setSending(true); setError('');
     try {
       await api.messages.send(selected.id, draft.trim(), attachment || null);
+      forceScrollRef.current = true;
       setDraft(''); setAttachment(''); await fetchMessages(selected.id); await fetchConversations();
     } catch (err) { setError(err instanceof Error ? err.message : 'The message could not be sent.'); }
     finally { setSending(false); }
@@ -292,7 +336,7 @@ export default function ChatPage() {
                 )}
               </header>
 
-              <div className="flex-1 space-y-5 overflow-y-auto p-4 sm:p-7" style={{ background: `radial-gradient(circle at 50% 0%, var(--gold-pale), transparent 42%)` }}>
+              <div ref={threadRef} onScroll={(event) => { const el = event.currentTarget; const isNear = el.scrollHeight - el.scrollTop - el.clientHeight <= 100; setNearBottom(isNear); if (isNear) setUnreadBelow(0); }} className="relative flex-1 space-y-5 overflow-y-auto p-4 sm:p-7" style={{ background: `radial-gradient(circle at 50% 0%, var(--gold-pale), transparent 42%)` }}>
                 {messages.length === 0 && (
                   <div className="mx-auto max-w-sm py-20 text-center">
                     <MessageCircle className="mx-auto" size={25} style={{ color: 'var(--moss)' }} />
@@ -323,7 +367,7 @@ export default function ChatPage() {
                             right-aligned dropdown never spills off-screen. */}
                         {mine && actions}
                         {/* A 16:9 embed needs room to breathe; a line of text does not. */}
-                        <div className={`${embedded ? 'w-full max-w-[92%] sm:max-w-[560px]' : 'max-w-[82%] sm:max-w-[68%]'} ${mine ? 'text-right' : 'text-left'}`}>
+                        <div className={`min-w-0 ${embedded ? 'w-full max-w-[calc(100%-3rem)] sm:max-w-[560px]' : 'max-w-[calc(100%-3rem)] sm:max-w-[68%]'} ${mine ? 'text-right' : 'text-left'}`}>
                           <div className={`message-bubble ${mine ? 'message-mine' : 'message-theirs'}`} style={{ color: removed ? 'var(--ink-4)' : 'var(--ink)' }}>
                             {removed && <p className="italic">{text('chat.removed_message', 'This message was removed by the owner.')}</p>}
                             {!removed && msg.body && <RichBody body={msg.body} />}
@@ -361,6 +405,12 @@ export default function ChatPage() {
                   })}
                 </AnimatePresence>
                 <div ref={bottomRef} />
+                {!nearBottom && (
+                  <button onClick={() => scrollToLatest(false)} className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full px-4 py-2.5 text-sm shadow-lg" style={{ background: 'var(--bg-surface)', color: 'var(--ink)', border: '1px solid var(--border-soft)' }} aria-label="Jump to latest messages">
+                    <ArrowDown size={16} /> Latest
+                    {unreadBelow > 0 && <span className="grid min-w-5 place-items-center rounded-full px-1.5 py-0.5 font-mono text-[9px]" style={{ background: 'var(--gold)', color: '#F8F4E9' }}>{unreadBelow}</span>}
+                  </button>
+                )}
               </div>
 
               <div className="border-t p-3 sm:p-5" style={{ borderColor: 'var(--border-soft)' }}>

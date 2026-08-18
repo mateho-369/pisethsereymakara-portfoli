@@ -9,6 +9,10 @@ return [
     'debug' => (bool) env('APP_DEBUG', false),
     'url' => env('APP_URL', 'http://localhost'),
     'frontend_url' => env('FRONTEND_URL', 'http://localhost:5173'),
+
+    // Addresses allowed to set CF-Connecting-IP / X-Forwarded-For. Read via
+    // config (not env()) so it still resolves under `php artisan config:cache`.
+    'trusted_proxies' => env('TRUSTED_PROXIES', ''),
     'timezone' => 'UTC',
     'locale' => env('APP_LOCALE', 'en'),
     'fallback_locale' => env('APP_FALLBACK_LOCALE', 'en'),

@@ -18,7 +18,10 @@ export default function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  useEffect(() => { if (user) navigate((location.state as { from?: string } | null)?.from || '/chat', { replace: true }); }, [user, navigate, location.state]);
+  // Where to land afterwards: back to /ask/{slug} when that is where they came from.
+  const from = (location.state as { from?: string } | null)?.from || '/chat';
+
+  useEffect(() => { if (user) navigate(from, { replace: true }); }, [user, navigate, from]);
   useEffect(() => { setError(''); setNotice(''); }, [mode]);
 
   const submit = async (event: FormEvent) => {
@@ -31,7 +34,7 @@ export default function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
       if (isSignup) await api.auth.register(form.name.trim(), form.email, form.password);
       else await api.auth.login(form.email, form.password);
       await refresh();
-      navigate('/chat');
+      navigate(from, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'We could not open your account.');
     } finally { setBusy(false); }
@@ -103,7 +106,7 @@ export default function AuthPage({ mode }: { mode: 'login' | 'signup' }) {
         </div>
 
         <button
-          onClick={() => { if (!signInWithGoogle()) setError('Google sign-in is not available right now. Please use email instead.'); }}
+          onClick={() => { if (!signInWithGoogle(from)) setError('Google sign-in is not available right now. Please use email instead.'); }}
           className="btn-outline w-full justify-center"
         >
           <CircleUserRound size={17} /> Continue with Google

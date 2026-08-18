@@ -13,7 +13,9 @@ const AuthPage = lazy(() => import('./pages/AuthPage'));
 const ChatPage = lazy(() => import('./pages/ChatPage'));
 const GalleryPage = lazy(() => import('./pages/GalleryPage'));
 const HomePage = lazy(() => import('./pages/HomePage'));
+const CampaignPage = lazy(() => import('./pages/CampaignPage'));
 const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'));
+const CampaignsPanel = lazy(() => import('./pages/admin/CampaignsPanel'));
 const ContentPanel = lazy(() => import('./pages/admin/ContentPanel'));
 const FavoritesPanel = lazy(() => import('./pages/admin/FavoritesPanel'));
 const MediaPanel = lazy(() => import('./pages/admin/MediaPanel'));
@@ -32,11 +34,12 @@ export default function App() {
     <Route element={<Layout />}>
       <Route path="/" element={<HomePage />} /><Route path="/gallery" element={<GalleryPage />} />
       <Route path="/login" element={<AuthPage mode="login" />} /><Route path="/signup" element={<AuthPage mode="signup" />} />
+      <Route path="/ask/:slug" element={<CampaignPage />} />
       <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
       <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
         <Route index element={<OverviewPanel />} /><Route path="profile" element={<ProfilePanel />} />
         <Route path="content" element={<ContentPanel />} /><Route path="favorites" element={<FavoritesPanel />} />
-        <Route path="media" element={<MediaPanel />} /><Route path="people" element={<PeoplePanel />} /><Route path="studio" element={<StudioPanel />} />
+        <Route path="campaigns" element={<CampaignsPanel />} /><Route path="media" element={<MediaPanel />} /><Route path="people" element={<PeoplePanel />} /><Route path="studio" element={<StudioPanel />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Route>

@@ -33,6 +33,15 @@ export default {
     forwardHeaders.set('Host', backendUrl.host);
     forwardHeaders.set('X-Forwarded-Host', url.host);
     forwardHeaders.set('X-Forwarded-Proto', 'https');
+    // Laravel keys its rate limiters on the visitor's address. Without this the
+    // backend only ever sees the Worker's egress IP and every visitor shares a
+    // single bucket. `request.cf` is set by Cloudflare and cannot be spoofed by
+    // the client; the backend only trusts it from a configured TRUSTED_PROXIES.
+    const clientIp = request.headers.get('CF-Connecting-IP');
+    if (clientIp) {
+      forwardHeaders.set('CF-Connecting-IP', clientIp);
+      forwardHeaders.set('X-Forwarded-For', clientIp);
+    }
 
     let backendResponse;
     try {

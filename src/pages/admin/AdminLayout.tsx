@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { Heart, Image, Inbox, LayoutDashboard, Palette, Type, UserRound, Users } from 'lucide-react';
+import { Heart, Image, Inbox, LayoutDashboard, Megaphone, Palette, Type, UserRound, Users } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 const tabs = [
@@ -8,6 +8,7 @@ const tabs = [
   { to: '/admin/content', label: 'Site text', Icon: Type },
   { to: '/admin/favorites', label: 'Favorites', Icon: Heart },
   { to: '/admin/media', label: 'Media', Icon: Image },
+  { to: '/admin/campaigns', label: 'Campaigns', Icon: Megaphone },
   { to: '/admin/people', label: 'People', Icon: Users },
   { to: '/admin/studio', label: 'Studio', Icon: Palette },
   { to: '/chat', label: 'Inbox', Icon: Inbox },

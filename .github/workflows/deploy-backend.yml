@@ -19,6 +19,7 @@ jobs:
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           script: |
+            set -e
             cd ~/pisethsereymakara-portfoli
             git pull origin main
             docker compose -p personal-portfoli-makara-mateho -f docker-compose.prod.yml up -d --build --no-deps --force-recreate app nginx

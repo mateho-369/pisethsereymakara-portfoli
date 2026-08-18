@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
-import { Check, Eye, EyeOff, Image as ImageIcon, LoaderCircle, Play, Star, Trash2, UploadCloud, Video, X } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Check, Eye, EyeOff, Image as ImageIcon, LoaderCircle, Play, Star, Trash2, UploadCloud, Video } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useContent } from '../contexts/ContentContext';
 import type { MediaItem } from '../types';
 import LoadingState from '../components/LoadingState';
+import MediaLightbox, { type LightboxItem } from '../components/MediaLightbox';
 import MediaThumbnail from '../components/MediaThumbnail';
 import { api } from '../lib/api';
 import { useUpload } from '../lib/useUpload';
@@ -20,7 +21,7 @@ export default function GalleryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState<typeof filters[number]>('All');
-  const [selected, setSelected] = useState<MediaItem | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [manage, setManage] = useState(false);
   const [form, setForm] = useState({ title: '', description: '', category: 'Field Notes' });
   const fileRef = useRef<HTMLInputElement>(null);
@@ -42,6 +43,15 @@ export default function GalleryPage() {
     if (filter === 'Favorites') return item.is_favorite;
     return true;
   }), [filter, items]);
+
+  const lightboxItems = useMemo<LightboxItem[]>(() => filtered.map((item) => ({
+    url: item.media_url,
+    type: item.media_type === 'video' ? 'video' : 'image',
+    alt: item.title,
+    title: item.title,
+    description: item.description,
+    date: item.captured_at,
+  })), [filtered]);
 
   const upload = async () => {
     const file = fileRef.current?.files?.[0];
@@ -162,8 +172,8 @@ export default function GalleryPage() {
         </div>
       ) : filtered.length ? (
         <motion.div layout className="columns-1 gap-4 sm:columns-2 lg:columns-3">
-          {filtered.map((item) => (
-            <motion.button layout key={item.id} onClick={() => setSelected(item)} className="gallery-card group mb-4 w-full break-inside-avoid text-left">
+          {filtered.map((item, idx) => (
+            <motion.button layout key={item.id} onClick={() => setLightboxIndex(idx)} className="gallery-card group mb-4 w-full break-inside-avoid text-left">
               <div className={`relative overflow-hidden ${aspectClass[item.aspect_ratio] || 'aspect-[4/3]'}`}>
                 <MediaThumbnail url={item.thumbnail_url} alt={item.title} loading="lazy" className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.025]" />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#1A1F18]/75 via-transparent to-transparent opacity-40 transition group-hover:opacity-80" />
@@ -188,25 +198,13 @@ export default function GalleryPage() {
       )}
 
       {/* ── Lightbox ── */}
-      <AnimatePresence>
-        {selected && (
-          <motion.div className="fixed inset-0 z-[80] grid place-items-center p-4 backdrop-blur-md" style={{ background: 'rgba(26,31,24,.85)' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelected(null)}>
-            <motion.div initial={{ scale: .97, y: 8 }} animate={{ scale: 1, y: 0 }} exit={{ scale: .97 }} onClick={(e) => e.stopPropagation()} className="relative max-h-[92vh] w-full max-w-5xl overflow-auto rounded-2xl shadow-2xl" style={{ background: 'var(--bg-surface)' }}>
-              <button onClick={() => setSelected(null)} className="absolute right-4 top-4 z-10 grid h-10 w-10 place-items-center rounded-full shadow backdrop-blur" style={{ background: 'var(--bg-surface)', color: 'var(--ink)' }} aria-label="Close"><X size={19} /></button>
-              {selected.media_type === 'video'
-                ? <video src={selected.media_url} controls autoPlay className="max-h-[70vh] w-full object-contain" style={{ background: 'var(--bg-muted)' }} />
-                : <img src={selected.media_url} alt={selected.title} className="max-h-[70vh] w-full object-contain" style={{ background: 'var(--bg-muted)' }} />}
-              <div className="p-6 sm:p-8">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h2 className="font-serif text-3xl" style={{ color: 'var(--ink)' }}>{selected.title}</h2>
-                  <span className="font-mono text-[9px] uppercase tracking-[.16em]" style={{ color: 'var(--ink-3)' }}>{new Date(selected.captured_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</span>
-                </div>
-                <p className="mt-3 max-w-2xl leading-relaxed" style={{ color: 'var(--ink-2)' }}>{selected.description}</p>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <MediaLightbox
+        items={lightboxItems}
+        activeIndex={lightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+        onNavigate={setLightboxIndex}
+        showDetails
+      />
     </div>
   );
 }

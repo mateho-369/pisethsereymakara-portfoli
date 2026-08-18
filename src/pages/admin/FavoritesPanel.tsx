@@ -7,6 +7,7 @@ import { useToast } from '../../components/ui/Toast';
 import { TextField } from '../../components/ui/Field';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import KebabMenu from '../../components/ui/KebabMenu';
 import LoadingState from '../../components/LoadingState';
 import type { Favorite } from '../../types';
 
@@ -111,7 +112,9 @@ export default function FavoritesPanel() {
                 <button onClick={() => move(index, -1)} disabled={index === 0} className="icon-button disabled:opacity-30" aria-label="Move up"><ArrowUp size={16} /></button>
                 <button onClick={() => move(index, 1)} disabled={index === items.length - 1} className="icon-button disabled:opacity-30" aria-label="Move down"><ArrowDown size={16} /></button>
                 <button onClick={() => openEdit(favorite)} className="icon-button" aria-label="Edit"><Pencil size={16} /></button>
-                <button onClick={() => setRemoving(favorite)} className="icon-button" aria-label="Remove"><Trash2 size={16} /></button>
+                <KebabMenu actions={[
+                  { label: 'Remove card', icon: <Trash2 size={15} />, danger: true, onClick: () => setRemoving(favorite) },
+                ]} />
               </div>
             </div>
           );

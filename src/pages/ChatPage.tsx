@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Archive, ArchiveRestore, ArrowLeft, Ban, FileText, Inbox, LoaderCircle, MessageCircle, Paperclip, Search, Send, ShieldCheck, Trash2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -7,6 +7,9 @@ import { api } from '../lib/api';
 import { isImageUrl, isVideoUrl } from '../lib/mediaUrl';
 import type { Conversation, Message, Profile } from '../types';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import KebabMenu from '../components/ui/KebabMenu';
+import MediaLightbox, { type LightboxItem } from '../components/MediaLightbox';
+import RichBody from '../components/RichBody';
 import { useToast } from '../components/ui/Toast';
 import LoadingState from '../components/LoadingState';
 
@@ -37,8 +40,19 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const attachmentItems = useMemo<LightboxItem[]>(() => {
+    return messages
+      .filter((m) => m.attachment_url && !m.deleted_at && (isImageUrl(m.attachment_url) || isVideoUrl(m.attachment_url)))
+      .map((m) => ({
+        url: m.attachment_url!,
+        type: isVideoUrl(m.attachment_url!) ? 'video' as const : 'image' as const,
+        alt: `Attachment from ${m.sender_role}`,
+      }));
+  }, [messages]);
 
   const fetchMessages = useCallback(async (id: number) => {
     setMessages(await api.messages.list(id));
@@ -223,15 +237,18 @@ export default function ChatPage() {
 
                 {isAdmin && (
                   <div className="ml-auto flex items-center gap-1">
-                    <button onClick={() => toggleVisitorBlock(selected)} className="icon-button" title={selected.visitor_blocked ? 'Allow messaging' : 'Pause messaging'} aria-label="Toggle messaging">
-                      {selected.visitor_blocked ? <ShieldCheck size={17} /> : <Ban size={17} />}
-                    </button>
                     <button onClick={() => setArchived(selected, selected.status !== 'archived')} className="icon-button" title={selected.status === 'archived' ? 'Restore' : 'Archive'} aria-label="Archive conversation">
                       {selected.status === 'archived' ? <ArchiveRestore size={17} /> : <Archive size={17} />}
                     </button>
-                    <button onClick={() => setPendingThread(selected)} className="icon-button" title="Delete conversation" aria-label="Delete conversation">
-                      <Trash2 size={17} />
-                    </button>
+                    <KebabMenu actions={[
+                      {
+                        label: selected.visitor_blocked ? 'Allow messaging' : 'Pause messaging',
+                        icon: selected.visitor_blocked ? <ShieldCheck size={15} /> : <Ban size={15} />,
+                        danger: !selected.visitor_blocked,
+                        onClick: () => toggleVisitorBlock(selected),
+                      },
+                      { label: 'Delete conversation', icon: <Trash2 size={15} />, danger: true, onClick: () => setPendingThread(selected) },
+                    ]} />
                   </div>
                 )}
               </header>
@@ -248,6 +265,9 @@ export default function ChatPage() {
                   {messages.map((msg) => {
                     const mine = msg.sender_id === String(user?.id);
                     const removed = Boolean(msg.deleted_at);
+                    const attachmentLightboxIdx = !removed && msg.attachment_url
+                      ? attachmentItems.findIndex((item) => item.url === msg.attachment_url)
+                      : -1;
                     return (
                       <motion.div key={msg.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={`group flex items-center gap-2 ${mine ? 'justify-end' : 'justify-start'}`}>
                         {isAdmin && !removed && (
@@ -263,12 +283,24 @@ export default function ChatPage() {
                         <div className={`max-w-[82%] sm:max-w-[68%] ${mine ? 'text-right' : 'text-left'}`}>
                           <div className={`message-bubble ${mine ? 'message-mine' : 'message-theirs'}`} style={{ color: removed ? 'var(--ink-4)' : 'var(--ink)' }}>
                             {removed && <p className="italic">{text('chat.removed_message', 'This message was removed by the owner.')}</p>}
-                            {!removed && msg.body && <p className="whitespace-pre-wrap">{msg.body}</p>}
+                            {!removed && msg.body && <RichBody body={msg.body} />}
                             {!removed && msg.attachment_url && (
                               isImageUrl(msg.attachment_url) ? (
-                                <img src={msg.attachment_url} alt="Message attachment" loading="lazy" className="mt-2 max-h-72 w-full rounded-lg object-contain" style={{ background: 'var(--bg-muted)' }} />
+                                <button
+                                  onClick={() => attachmentLightboxIdx >= 0 && setLightboxIndex(attachmentLightboxIdx)}
+                                  className="mt-2 block cursor-zoom-in overflow-hidden rounded-lg"
+                                  aria-label="View image"
+                                >
+                                  <img src={msg.attachment_url} alt="Message attachment" loading="lazy" className="max-h-72 w-full rounded-lg object-contain transition hover:opacity-90" style={{ background: 'var(--bg-muted)' }} />
+                                </button>
                               ) : isVideoUrl(msg.attachment_url) ? (
-                                <video src={msg.attachment_url} controls playsInline preload="metadata" className="mt-2 max-h-72 w-full rounded-lg" style={{ background: 'var(--bg-muted)' }} />
+                                <button
+                                  onClick={() => attachmentLightboxIdx >= 0 && setLightboxIndex(attachmentLightboxIdx)}
+                                  className="mt-2 block cursor-zoom-in overflow-hidden rounded-lg"
+                                  aria-label="View video"
+                                >
+                                  <video src={msg.attachment_url} playsInline preload="metadata" className="pointer-events-none max-h-72 w-full rounded-lg" style={{ background: 'var(--bg-muted)' }} />
+                                </button>
                               ) : (
                                 <a href={msg.attachment_url} target="_blank" rel="noreferrer" className="mt-2 flex items-center gap-2 rounded-lg p-2 text-sm underline" style={{ background: 'var(--bg-muted)' }}>
                                   <FileText size={16} /> View attachment
@@ -337,6 +369,14 @@ export default function ChatPage() {
           )}
         </section>
       </div>
+
+      <MediaLightbox
+        items={attachmentItems}
+        activeIndex={lightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+        onNavigate={setLightboxIndex}
+        showDetails={false}
+      />
 
       <ConfirmDialog
         open={pendingRemoval !== null}

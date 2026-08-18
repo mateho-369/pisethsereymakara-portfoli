@@ -7,6 +7,7 @@ import { useToast } from '../../components/ui/Toast';
 import { TextField } from '../../components/ui/Field';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import KebabMenu from '../../components/ui/KebabMenu';
 import LoadingState from '../../components/LoadingState';
 import type { AdminUser } from '../../types';
 
@@ -90,12 +91,14 @@ export default function PeoplePanel() {
                 {user.conversation_id && (
                   <Link to="/chat" className="icon-button" aria-label="Open conversation"><MessageCircle size={16} /></Link>
                 )}
-                {!isOwner && (blocked ? (
-                  <button onClick={() => unblock(user)} className="icon-button" aria-label="Allow messaging" title="Allow messaging again"><ShieldCheck size={16} /></button>
-                ) : (
-                  <button onClick={() => { setBlocking(user); setReason(''); }} className="icon-button" aria-label="Pause messaging" title="Pause messaging"><Ban size={16} /></button>
-                ))}
-                {!isOwner && <button onClick={() => setRemoving(user)} className="icon-button" aria-label="Delete account"><Trash2 size={16} /></button>}
+                {!isOwner && (
+                  <KebabMenu actions={[
+                    blocked
+                      ? { label: 'Allow messaging', icon: <ShieldCheck size={15} />, onClick: () => unblock(user) }
+                      : { label: 'Pause messaging', icon: <Ban size={15} />, danger: true, onClick: () => { setBlocking(user); setReason(''); } },
+                    { label: 'Delete account', icon: <Trash2 size={15} />, danger: true, onClick: () => setRemoving(user) },
+                  ]} />
+                )}
               </div>
             </div>
           );

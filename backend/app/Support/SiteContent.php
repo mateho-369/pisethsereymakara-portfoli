@@ -134,6 +134,13 @@ class SiteContent
                 'footer.copyright_suffix' => ['Line after the year', 'text', '', 'Optional note beside the copyright line.'],
             ],
 
+            'Seasonal theme' => [
+                'theme.active' => ['Active theme', 'text', 'default', 'Options: default, christmas, halloween, khmer-new-year, pchum-ben, bon-om-touk.'],
+                'theme.greeting' => ['Seasonal greeting', 'text', '', 'Shown in the header when a seasonal theme is active.'],
+                'theme.start_date' => ['Theme start date', 'text', '', 'Optional — when the theme auto-activates (YYYY-MM-DD).'],
+                'theme.end_date' => ['Theme end date', 'text', '', 'Optional — when the theme auto-deactivates (YYYY-MM-DD).'],
+            ],
+
             'Browser & 404' => [
                 'meta.title' => ['Browser tab title', 'text', 'Field Notes — Piseth Serey Makara', ''],
                 'meta.description' => ['Meta description', 'textarea', 'Field Notes — a peaceful personal portfolio, visual journal, and quiet place to connect.', ''],

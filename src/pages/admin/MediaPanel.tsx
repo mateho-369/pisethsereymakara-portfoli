@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, Eye, EyeOff, LoaderCircle, Pencil, Plus, Star, Trash2, UploadCloud } from 'lucide-react';
+import { ArrowDown, ArrowUp, Eye, EyeOff, LoaderCircle, Pencil, Star, Trash2, UploadCloud } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useResource } from '../../lib/useResource';
 import { useUpload } from '../../lib/useUpload';
@@ -7,8 +7,10 @@ import { useToast } from '../../components/ui/Toast';
 import { SelectField, Switch, TextField } from '../../components/ui/Field';
 import Modal from '../../components/ui/Modal';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import KebabMenu from '../../components/ui/KebabMenu';
 import LoadingState from '../../components/LoadingState';
 import MediaThumbnail from '../../components/MediaThumbnail';
+import PostComposer from '../../components/PostComposer';
 import type { MediaItem } from '../../types';
 
 const aspectOptions = [
@@ -24,47 +26,16 @@ export default function MediaPanel() {
   const load = useCallback(() => api.media.list(true), []);
   const { data: items, setData, loading, error, reload } = useResource<MediaItem[]>(load, []);
 
-  const { upload, uploadMedia, uploading, progress } = useUpload('media');
-  const newFileRef = useRef<HTMLInputElement>(null);
+  const { upload, uploadMedia, uploading } = useUpload('media');
   const replaceRef = useRef<HTMLInputElement>(null);
   const coverRef = useRef<HTMLInputElement>(null);
 
-  const [addForm, setAddForm] = useState({ title: '', category: 'Field Notes', description: '' });
-  const [chosenFile, setChosenFile] = useState<File | null>(null);
   const [editing, setEditing] = useState<MediaItem | null>(null);
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState<MediaItem | null>(null);
 
   if (loading) return <LoadingState label="Developing the photographs…" />;
   if (error) return <div className="admin-card" style={{ color: 'var(--gold-deep)' }}>{error}</div>;
-
-  const addPiece = async () => {
-    const file = chosenFile;
-    if (!file || !addForm.title.trim()) return toastError('Add a title and choose an image or video first.');
-    try {
-      const uploaded = await uploadMedia(file);
-      await api.media.create({
-        ...addForm,
-        media_type: uploaded.isVideo ? 'video' : 'photo',
-        thumbnail_url: uploaded.thumbnailUrl,
-        media_url: uploaded.url,
-        size_label: uploaded.sizeLabel,
-        aspect_ratio: 'landscape',
-        captured_at: new Date().toISOString(),
-        is_favorite: false,
-        is_public: true,
-      });
-      setAddForm({ title: '', category: addForm.category, description: '' });
-      setChosenFile(null);
-      if (newFileRef.current) newFileRef.current.value = '';
-      await reload();
-      success(uploaded.posterMissing
-        ? 'Added to the gallery, but the browser could not make a video cover. Open Edit to upload a cover image.'
-        : 'Added to the gallery.');
-    } catch (err) {
-      toastError(err instanceof Error ? err.message : 'The upload did not finish.');
-    }
-  };
 
   const patch = async (item: MediaItem, changes: Partial<MediaItem>) => {
     try { await api.media.update(item.id, changes); await reload(); }
@@ -153,25 +124,7 @@ export default function MediaPanel() {
 
   return (
     <div className="space-y-5">
-      <section className="admin-card">
-        <h2 className="font-serif text-2xl" style={{ color: 'var(--ink)' }}>Add to the journal</h2>
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
-          <button onClick={() => newFileRef.current?.click()} className="flex min-h-40 flex-col items-center justify-center rounded-2xl border border-dashed p-6 text-center" style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}>
-            <span className="grid h-11 w-11 place-items-center rounded-full" style={{ background: 'var(--gold-pale)', color: 'var(--gold-deep)' }}><UploadCloud size={20} /></span>
-            <strong className="mt-3 font-serif text-lg" style={{ color: 'var(--ink)' }}>Choose an image or film</strong>
-            <span className="mt-1 text-xs" style={{ color: 'var(--ink-3)' }}>{chosenFile?.name || 'Up to 4 MB'}</span>
-          </button>
-          <div className="space-y-3">
-            <input ref={newFileRef} type="file" accept="image/*,video/*" className="hidden" onChange={(event) => setChosenFile(event.target.files?.[0] || null)} />
-            <TextField label="Title" value={addForm.title} onChange={(title) => setAddForm({ ...addForm, title })} />
-            <TextField label="Category" value={addForm.category} onChange={(category) => setAddForm({ ...addForm, category })} />
-            <TextField label="Caption" value={addForm.description} onChange={(description) => setAddForm({ ...addForm, description })} />
-            <button onClick={addPiece} disabled={uploading} className="btn-primary w-full justify-center disabled:opacity-60">
-              {uploading ? <><LoaderCircle className="animate-spin" size={16} /> Curating… {progress}%</> : <><Plus size={16} /> Add to gallery</>}
-            </button>
-          </div>
-        </div>
-      </section>
+      <PostComposer onPublished={reload} />
 
       <section className="admin-card">
         {items.map((item, index) => (
@@ -193,7 +146,9 @@ export default function MediaPanel() {
                 {item.is_public ? <Eye size={16} /> : <EyeOff size={16} />}
               </button>
               <button onClick={() => setEditing(item)} className="icon-button" aria-label="Edit"><Pencil size={16} /></button>
-              <button onClick={() => setRemoving(item)} className="icon-button" aria-label="Delete"><Trash2 size={16} /></button>
+              <KebabMenu actions={[
+                { label: 'Delete from gallery', icon: <Trash2 size={15} />, danger: true, onClick: () => setRemoving(item) },
+              ]} />
             </div>
           </div>
         ))}

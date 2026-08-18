@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { type BodySegment, parseBodyWithEmbeds } from '../lib/embeds';
+import { type EmbedSegment, parseBodyWithEmbeds } from '../lib/embeds';
 
 interface RichBodyProps {
   body: string;
@@ -14,18 +14,32 @@ export default function RichBody({ body }: RichBodyProps) {
 
   return (
     <>
-      {segments.map((segment, i) =>
-        segment.kind === 'text' ? (
-          <span key={i} className="whitespace-pre-wrap">{segment.content}</span>
-        ) : (
-          <LazyEmbed key={i} segment={segment} />
-        )
-      )}
+      {segments.map((segment, i) => {
+        if (segment.kind === 'text') {
+          return <span key={i} className="whitespace-pre-wrap">{segment.content}</span>;
+        }
+        if (segment.kind === 'link') {
+          // Not an embeddable video — just an ordinary link, nothing boxed.
+          return (
+            <a
+              key={i}
+              href={segment.url}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="break-all underline underline-offset-2"
+              style={{ color: 'var(--fjord)' }}
+            >
+              {segment.url}
+            </a>
+          );
+        }
+        return <LazyEmbed key={i} segment={segment} />;
+      })}
     </>
   );
 }
 
-function LazyEmbed({ segment }: { segment: BodySegment & { kind: 'embed' } }) {
+function LazyEmbed({ segment }: { segment: EmbedSegment }) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
 

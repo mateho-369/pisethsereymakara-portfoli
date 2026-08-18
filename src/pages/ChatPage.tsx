@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Archive, ArchiveRestore, ArrowLeft, Ban, FileText, Inbox, LoaderCircle, MessageCircle, Paperclip, Search, Send, ShieldCheck, Trash2 } from 'lucide-react';
+import { Archive, ArchiveRestore, ArrowLeft, Ban, Copy, FileText, Inbox, Link2, LoaderCircle, MessageCircle, Paperclip, Search, Send, ShieldCheck, Trash2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useContent } from '../contexts/ContentContext';
 import { api } from '../lib/api';
+import { firstUrl, hasEmbed } from '../lib/embeds';
 import { isImageUrl, isVideoUrl } from '../lib/mediaUrl';
 import type { Conversation, Message, Profile } from '../types';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
-import KebabMenu from '../components/ui/KebabMenu';
+import KebabMenu, { type KebabAction } from '../components/ui/KebabMenu';
 import MediaLightbox, { type LightboxItem } from '../components/MediaLightbox';
 import RichBody from '../components/RichBody';
 import { useToast } from '../components/ui/Toast';
@@ -19,6 +20,35 @@ function relativeTime(value: string) {
   if (s < 3600) return `${Math.floor(s / 60)}m`;
   if (s < 86400) return `${Math.floor(s / 3600)}h`;
   return `${Math.floor(s / 86400)}d`;
+}
+
+interface MessageActionsProps {
+  body: string;
+  canDelete: boolean;
+  onCopy: () => void;
+  onCopyLink: (url: string) => void;
+  onDelete: () => void;
+}
+
+/**
+ * Per-message actions. Always visible rather than hover-only: there is no
+ * hover on a touch screen, so the old opacity-0 button was unreachable there.
+ */
+function MessageActions({ body, canDelete, onCopy, onCopyLink, onDelete }: MessageActionsProps) {
+  const link = body ? firstUrl(body) : null;
+  const actions: KebabAction[] = [];
+
+  if (body) actions.push({ label: 'Copy message', icon: <Copy size={15} />, onClick: onCopy });
+  if (link) actions.push({ label: 'Copy link', icon: <Link2 size={15} />, onClick: () => onCopyLink(link) });
+  if (canDelete) actions.push({ label: 'Delete', icon: <Trash2 size={15} />, danger: true, onClick: onDelete });
+
+  if (actions.length === 0) return null;
+
+  return (
+    <div className="shrink-0">
+      <KebabMenu actions={actions} label="Message actions" />
+    </div>
+  );
 }
 
 export default function ChatPage() {
@@ -85,6 +115,15 @@ export default function ChatPage() {
   const chooseConversation = async (c: Conversation) => {
     setSelected(c);
     if (isAdmin && c.unread_count > 0) { await api.conversations.markRead(c.id); fetchConversations(); }
+  };
+
+  const copyToClipboard = async (value: string, note: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      success(note);
+    } catch {
+      toastError('Your browser would not let us copy that.');
+    }
   };
 
   const removeMessage = async (message: Message) => {
@@ -268,19 +307,23 @@ export default function ChatPage() {
                     const attachmentLightboxIdx = !removed && msg.attachment_url
                       ? attachmentItems.findIndex((item) => item.url === msg.attachment_url)
                       : -1;
+                    const embedded = !removed && Boolean(msg.body) && hasEmbed(msg.body);
+                    const actions = !removed && (msg.body || isAdmin) ? (
+                      <MessageActions
+                        body={msg.body}
+                        canDelete={isAdmin}
+                        onCopy={() => copyToClipboard(msg.body, 'Message copied.')}
+                        onCopyLink={(url) => copyToClipboard(url, 'Link copied.')}
+                        onDelete={() => setPendingRemoval(msg)}
+                      />
+                    ) : null;
                     return (
                       <motion.div key={msg.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className={`group flex items-center gap-2 ${mine ? 'justify-end' : 'justify-start'}`}>
-                        {isAdmin && !removed && (
-                          <button
-                            onClick={() => setPendingRemoval(msg)}
-                            className="icon-button !h-8 !w-8 opacity-0 transition group-hover:opacity-100"
-                            aria-label="Remove this message"
-                            title="Remove this message"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        )}
-                        <div className={`max-w-[82%] sm:max-w-[68%] ${mine ? 'text-right' : 'text-left'}`}>
+                        {/* Actions sit on the inner side of the bubble so the
+                            right-aligned dropdown never spills off-screen. */}
+                        {mine && actions}
+                        {/* A 16:9 embed needs room to breathe; a line of text does not. */}
+                        <div className={`${embedded ? 'w-full max-w-[92%] sm:max-w-[560px]' : 'max-w-[82%] sm:max-w-[68%]'} ${mine ? 'text-right' : 'text-left'}`}>
                           <div className={`message-bubble ${mine ? 'message-mine' : 'message-theirs'}`} style={{ color: removed ? 'var(--ink-4)' : 'var(--ink)' }}>
                             {removed && <p className="italic">{text('chat.removed_message', 'This message was removed by the owner.')}</p>}
                             {!removed && msg.body && <RichBody body={msg.body} />}
@@ -312,6 +355,7 @@ export default function ChatPage() {
                             {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </time>
                         </div>
+                        {!mine && actions}
                       </motion.div>
                     );
                   })}

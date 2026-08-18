@@ -137,6 +137,8 @@ class SiteContent
             'Seasonal theme' => [
                 'theme.active' => ['Active theme', 'text', 'default', 'Options: default, christmas, halloween, khmer-new-year, pchum-ben, bon-om-touk.'],
                 'theme.greeting' => ['Seasonal greeting', 'text', '', 'Shown in the header when a seasonal theme is active.'],
+                'theme.particles' => ['Ambient particles', 'text', 'on', 'Set to "off" to hide the drifting seasonal effect (snow, petals, lanterns). Visitors with reduced-motion enabled never see it either way.'],
+                'theme.particle_intensity' => ['Particle density', 'text', 'normal', 'Options: subtle, normal, lively.'],
                 'theme.start_date' => ['Theme start date', 'text', '', 'Optional — when the theme auto-activates (YYYY-MM-DD).'],
                 'theme.end_date' => ['Theme end date', 'text', '', 'Optional — when the theme auto-deactivates (YYYY-MM-DD).'],
             ],

@@ -249,6 +249,9 @@ button:disabled { cursor: default; }
   --fjord:       #EC7063;
   --moss:        #E74C3C;
   --glow-hero:   rgba(244,208,63,.10);
+  --bg:          #1F1912;
+  --bg-surface:  #2A2219;
+  --bg-muted:    #342A1F;
   --ambient-1:   #F6E7A8;
   --ambient-2:   #F2D98B;
   --ambient-3:   #EFC98F;

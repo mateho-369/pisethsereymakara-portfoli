@@ -9,6 +9,7 @@ use App\Http\Controllers\MediaController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingController;
+use App\Http\Controllers\SocialShareController;
 use App\Http\Controllers\SystemController;
 use App\Http\Controllers\UploadController;
 use App\Http\Controllers\UserController;
@@ -29,6 +30,11 @@ Route::get('/campaigns/{slug}', [CampaignController::class, 'show']);
 Route::post('/campaigns/{slug}/respond', [CampaignController::class, 'respond'])->middleware('throttle:campaign-respond');
 Route::post('/campaigns/uploads/presign', [UploadController::class, 'campaign'])->middleware('throttle:uploads');
 
+// Social share cards for link previews. Crawlers fetch these with plain GET
+// requests — no session, no auth — so they stay public.
+Route::get('/og-image.png', [SocialShareController::class, 'siteOgImage']);
+Route::get('/campaigns/{slug}/og-image.png', [SocialShareController::class, 'campaignOgImage']);
+
 Route::prefix('auth')->group(function (): void {
     // Brute-force / credential-stuffing / signup-spam guard: 5 per minute,
     // keyed by IP and by submitted email so neither can be rotated around.
@@ -47,9 +53,9 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     // Writing is paused for blocked visitors; reading stays open.
     Route::middleware('not-blocked')->group(function (): void {
-    Route::post('/conversations', [ConversationController::class, 'store']);
-    Route::post('/conversations/{conversation}/messages', [MessageController::class, 'store']);
-    Route::post('/uploads/presign', [UploadController::class, 'chat'])->middleware('throttle:uploads');
+        Route::post('/conversations', [ConversationController::class, 'store']);
+        Route::post('/conversations/{conversation}/messages', [MessageController::class, 'store']);
+        Route::post('/uploads/presign', [UploadController::class, 'chat'])->middleware('throttle:uploads');
     });
 });
 

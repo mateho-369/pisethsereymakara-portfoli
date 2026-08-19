@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   CalendarClock, Camera, CheckCircle2, Ghost, ImageUp, Lock, MessageSquareQuote,
-  ShieldCheck, Vote,
+  Share2, ShieldCheck, Vote,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
@@ -31,6 +31,15 @@ const CLOSED_COPY: Record<Exclude<CampaignState, 'open'>, { title: string; body:
 };
 
 const TYPE_ICON = { poll: Vote, question: MessageSquareQuote, photo: Camera } as const;
+
+// Phone or tablet — where the OS share sheet (with Instagram, Facebook,
+// Messages…) is the Story handoff. Desktops get plain share or copy.
+const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(typeof navigator !== 'undefined' ? navigator.userAgent : '');
+
+/** True when a Web Share rejection means "the user cancelled" — not an error. */
+function isShareCancelled(error: unknown) {
+  return error instanceof DOMException && (error.name === 'AbortError' || error.name === 'NotAllowedError');
+}
 
 /**
  * The public campaign page behind /ask/{slug}.
@@ -63,6 +72,7 @@ export default function CampaignPage() {
   const [guest, setGuest] = useState(false);
   /** This visit's own confirmation — guests have no stored "my response". */
   const [lastSubmitted, setLastSubmitted] = useState<MyCampaignResponse | null>(null);
+  const [sharing, setSharing] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const returnTo = `/ask/${slug}`;
@@ -138,6 +148,61 @@ export default function CampaignPage() {
       toastError(err instanceof Error ? err.message : 'That could not be sent.');
     } finally {
       setBusy(false);
+    }
+  };
+
+  // Hand the campaign link to the OS share sheet. On phones that sheet lists
+  // Instagram / Facebook / Messages with their "add to story" flows — Meta's
+  // direct Story URL schemes are native-SDK only, so this is the web's
+  // reliable route. Desktops without a share sheet fall back to copy-link.
+  // Every failure path degrades quietly to copy; nothing throws a scary error.
+  const shareCampaign = async () => {
+    const canonicalUrl = `${window.location.origin}/ask/${slug}`;
+    const title = campaign.title;
+    const text = campaign.prompt || 'Check this out on Field Notes.';
+
+    const copyLink = async () => {
+      try {
+        await navigator.clipboard.writeText(canonicalUrl);
+        success('Link copied — paste it wherever you like.');
+      } catch {
+        toastError('Could not copy the link. It is: ' + canonicalUrl);
+      }
+    };
+
+    setSharing(true);
+    try {
+      const nav = navigator as Navigator & { share?: (data: ShareData) => Promise<void>; canShare?: (data: ShareData) => boolean };
+
+      if (nav.share) {
+        // Best case: share the link together with the generated card image so
+        // the Story / message preview is branded.
+        if (IS_MOBILE && nav.canShare) {
+          try {
+            const image = await fetch(`/api/campaigns/${encodeURIComponent(slug)}/og-image.png`);
+            if (image.ok) {
+              const file = new File([await image.blob()], `field-notes-${campaign.slug}.png`, { type: 'image/png' });
+              if (nav.canShare({ files: [file] })) {
+                await nav.share({ title, text, url: canonicalUrl, files: [file] });
+                return;
+              }
+            }
+          } catch (err) {
+            if (isShareCancelled(err)) return; // user dismissed the sheet
+          }
+        }
+
+        try {
+          await nav.share({ title, text, url: canonicalUrl });
+          return;
+        } catch (err) {
+          if (isShareCancelled(err)) return; // user dismissed the sheet
+        }
+      }
+
+      await copyLink();
+    } finally {
+      setSharing(false);
     }
   };
 
@@ -415,6 +480,17 @@ export default function CampaignPage() {
             <p className="mt-6 text-sm" style={{ color: 'var(--ink-3)' }}>
               Thank you for voting. The results will be shared when this campaign closes.
             </p>
+          )}
+
+          {/* Share: the OS share sheet on phones (where Instagram / Facebook /
+              Messages live), plain share on desktop, copy-link as the floor. */}
+          {campaign.is_open && (
+            <div className="mt-8 flex justify-center">
+              <button onClick={() => void shareCampaign()} disabled={sharing} className="btn-outline flex items-center gap-2 !py-2.5">
+                <Share2 size={15} />
+                {sharing ? 'Opening share…' : IS_MOBILE ? 'Share to your story' : 'Share this campaign'}
+              </button>
+            </div>
           )}
         </div>
 

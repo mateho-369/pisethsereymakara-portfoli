@@ -24,12 +24,17 @@ class UploadController extends Controller
      * Campaign photo submissions reuse the exact same presigned browser → MinIO
      * flow, but land under the private `campaigns/` prefix and only return the
      * object key: no public URL is ever handed back for these.
+     *
+     * Signed-in users keep their per-account folder; guests (question and
+     * photo campaigns) land in the shared, account-free guest folder.
      */
     public function campaign(Request $request): JsonResponse
     {
+        $folder = CampaignPhotoStorage::PREFIX.'/'.($request->user()?->id ?? CampaignPhotoStorage::GUEST);
+
         return $this->presign(
             $request,
-            CampaignPhotoStorage::PREFIX.'/'.$request->user()->id,
+            $folder,
             ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
             false,
         );

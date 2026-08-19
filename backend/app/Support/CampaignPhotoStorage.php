@@ -18,6 +18,13 @@ class CampaignPhotoStorage
 {
     public const PREFIX = 'campaigns';
 
+    /**
+     * Account-free folder for guest submissions (question and photo
+     * campaigns). Signed-in users keep their per-account folders; a user id
+     * is numeric, so this segment can never collide with one of them.
+     */
+    public const GUEST = 'guest';
+
     /** A short-lived read URL for a stored object key. */
     public static function temporaryUrl(?string $key, int $minutes = 15): ?string
     {

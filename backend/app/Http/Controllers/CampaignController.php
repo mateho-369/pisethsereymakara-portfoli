@@ -20,6 +20,12 @@ use Illuminate\Validation\ValidationException;
  * Everything here is validated server-side: the closed state rendered by the
  * UI is a courtesy, never the protection. Availability, campaign blocks and
  * one-response-per-account are all re-checked before a write is accepted.
+ *
+ * Polls stay login-required — one vote per person is only enforceable per
+ * account. Open questions and photo requests also accept guests, whose
+ * submissions store a NULL user_id: no account, no name, nothing traceable
+ * back to a person. That means guest submissions cannot be campaign-blocked
+ * either; blocking is keyed on accounts.
  */
 class CampaignController extends Controller
 {
@@ -39,15 +45,20 @@ class CampaignController extends Controller
     }
 
     /**
-     * Accept a response. Requires a knowingly signed-in account; there is no
-     * anonymous or fingerprinted path into this method.
+     * Accept a response.
+     *
+     * Polls require a knowingly signed-in account: one vote per person is
+     * enforced per account, so there is no anonymous path for them. Open
+     * questions and photo requests may be answered as a guest. A guest
+     * submission attaches no identity at all — no account, no name, nothing
+     * traceable back to a person — and is therefore stored with a NULL
+     * user_id. It cannot be campaign-blocked either, since blocking is keyed
+     * on accounts.
      */
     public function respond(Request $request, string $slug): JsonResponse
     {
         $campaign = Campaign::query()->slug($slug)->with('options')->first();
         abort_if(! $campaign || $campaign->status === 'draft', 404, 'This campaign is not available.');
-
-        $user = $request->user();
 
         // Server-side availability: dates and status, never trusting the UI.
         abort_unless($campaign->isAcceptingResponses(), 422, match ($campaign->availabilityState()) {
@@ -56,20 +67,37 @@ class CampaignController extends Controller
             default => 'This campaign is closed.',
         });
 
-        // Campaign-specific blocking, independent of site-wide chat blocking.
+        $user = $request->user();
+        $isGuest = $user === null;
+
+        // Polls stay login-required. Guests are only a thing for questions
+        // and photo requests, never votes.
         abort_if(
-            CampaignParticipantBlock::blocks($user->id, $campaign->id),
+            $isGuest && $campaign->type === Campaign::TYPE_POLL,
+            403,
+            'Please sign in to vote.',
+        );
+
+        // Campaign-specific blocking, independent of site-wide chat blocking.
+        // Only applies to accounts; a guest has no account to match against.
+        abort_if(
+            ! $isGuest && CampaignParticipantBlock::blocks($user->id, $campaign->id),
             403,
             'You are not able to take part in campaigns.',
         );
 
         // The messages above explain *why*; this is the authoritative check.
-        Gate::authorize('respond', $campaign);
+        // Guests are skipped — the policy is keyed on an account.
+        if (! $isGuest) {
+            Gate::authorize('respond', $campaign);
+        }
 
-        $existing = CampaignResponse::query()
-            ->where('campaign_id', $campaign->id)
-            ->where('user_id', $user->id)
-            ->first();
+        $existing = ! $isGuest
+            ? CampaignResponse::query()
+                ->where('campaign_id', $campaign->id)
+                ->where('user_id', $user->id)
+                ->first()
+            : null;
 
         abort_if(
             $existing !== null && ! $campaign->allow_updates,
@@ -84,14 +112,25 @@ class CampaignController extends Controller
             CampaignPhotoStorage::delete($existing->photo_key);
         }
 
-        try {
-            $response = CampaignResponse::updateOrCreate(
-                ['campaign_id' => $campaign->id, 'user_id' => $user->id],
-                $payload + ['moderation_status' => $campaign->type === Campaign::TYPE_PHOTO ? 'pending' : 'approved'],
-            );
-        } catch (UniqueConstraintViolationException) {
-            // Two submissions raced each other; the unique index settled it.
-            abort(422, 'You have already responded to this campaign.');
+        if (! $isGuest) {
+            try {
+                $response = CampaignResponse::updateOrCreate(
+                    ['campaign_id' => $campaign->id, 'user_id' => $user->id],
+                    $payload + ['moderation_status' => $campaign->type === Campaign::TYPE_PHOTO ? 'pending' : 'approved'],
+                );
+            } catch (UniqueConstraintViolationException) {
+                // Two submissions raced each other; the unique index settled it.
+                abort(422, 'You have already responded to this campaign.');
+            }
+        } else {
+            // A guest has no account to key a row on, so there is nothing to
+            // de-duplicate against. Each guest submission is a fresh,
+            // anonymous row with a NULL user_id.
+            $response = CampaignResponse::create($payload + [
+                'campaign_id' => $campaign->id,
+                'user_id' => null,
+                'moderation_status' => $campaign->type === Campaign::TYPE_PHOTO ? 'pending' : 'approved',
+            ]);
         }
 
         // Re-read so a freshly cast vote is reflected in the tally we return.
@@ -112,6 +151,15 @@ class CampaignController extends Controller
             'declared_name' => ['nullable', 'string', 'max:80'],
         ];
 
+        // The self-declared name is only ever stored for accounts. A guest
+        // submission attaches no identity at all, so any name posted with it
+        // is dropped server-side, not just hidden in the UI.
+        $declaredName = function (array $validated) use ($request): ?string {
+            return $request->user() !== null
+                ? $this->cleanName($validated['declared_name'] ?? null)
+                : null;
+        };
+
         if ($campaign->type === Campaign::TYPE_POLL) {
             $validated = $request->validate($shared + [
                 'poll_option_id' => ['required', 'integer', Rule::exists('campaign_poll_options', 'id')->where('campaign_id', $campaign->id)],
@@ -122,7 +170,7 @@ class CampaignController extends Controller
                 'answer_text' => null,
                 'photo_key' => null,
                 'referral_source' => $validated['referral_source'] ?? null,
-                'declared_name' => $this->cleanName($validated['declared_name'] ?? null),
+                'declared_name' => $declaredName($validated),
             ];
         }
 
@@ -136,7 +184,7 @@ class CampaignController extends Controller
                 'poll_option_id' => null,
                 'photo_key' => null,
                 'referral_source' => $validated['referral_source'] ?? null,
-                'declared_name' => $this->cleanName($validated['declared_name'] ?? null),
+                'declared_name' => $declaredName($validated),
             ];
         }
 
@@ -146,9 +194,13 @@ class CampaignController extends Controller
             'answer_text' => ['nullable', 'string', 'max:500'],
         ]);
 
-        // The key must belong to the private campaign prefix and to this user.
+        // The key must belong to the private campaign prefix and to this
+        // submission's own folder: the account's for signed-in users, the
+        // account-free guest folder for guests.
+        $folder = CampaignPhotoStorage::PREFIX.'/'.($request->user()?->id ?? CampaignPhotoStorage::GUEST);
+
         if (! CampaignPhotoStorage::isCampaignKey($validated['photo_key'])
-            || ! str_starts_with($validated['photo_key'], CampaignPhotoStorage::PREFIX.'/'.$request->user()->id.'/')) {
+            || ! str_starts_with($validated['photo_key'], $folder.'/')) {
             throw ValidationException::withMessages(['photo_key' => 'That upload could not be verified. Please try again.']);
         }
 
@@ -162,7 +214,7 @@ class CampaignController extends Controller
             'answer_text' => isset($validated['answer_text']) ? trim($validated['answer_text']) : null,
             'poll_option_id' => null,
             'referral_source' => $validated['referral_source'] ?? null,
-            'declared_name' => $this->cleanName($validated['declared_name'] ?? null),
+            'declared_name' => $declaredName($validated),
         ];
     }
 
@@ -197,6 +249,9 @@ class CampaignController extends Controller
             'end_date' => optional($campaign->end_date)->toIso8601String(),
             'allow_updates' => $campaign->allow_updates,
             'ask_referral' => $campaign->ask_referral,
+            // Decided here, not in the UI: polls need an account, questions
+            // and photos may be answered without one.
+            'allows_guests' => $campaign->type !== Campaign::TYPE_POLL,
             'referral_sources' => self::REFERRAL_SOURCES,
             'options' => $campaign->type === Campaign::TYPE_POLL
                 ? $campaign->options->map(fn ($option) => ['id' => $option->id, 'label' => $option->label])->values()->all()

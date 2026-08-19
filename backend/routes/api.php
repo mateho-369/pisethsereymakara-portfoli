@@ -9,6 +9,7 @@ use App\Http\Controllers\MediaController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingController;
+use App\Http\Controllers\SocialShareController;
 use App\Http\Controllers\SystemController;
 use App\Http\Controllers\UploadController;
 use App\Http\Controllers\UserController;
@@ -20,8 +21,19 @@ Route::get('/favorites', [FavoriteController::class, 'index']);
 Route::get('/media', [MediaController::class, 'index']);
 Route::get('/settings', [SettingController::class, 'index']);
 
-// Public campaign page. Readable signed-out; responding needs a real login.
+// Public campaign page. Readable signed-out.
 Route::get('/campaigns/{slug}', [CampaignController::class, 'show']);
+
+// Campaign participation: polls still require a login (the controller
+// enforces it), while open questions and photo requests may also be answered
+// by guests. Not gated by the site-wide chat pause, same as before.
+Route::post('/campaigns/{slug}/respond', [CampaignController::class, 'respond'])->middleware('throttle:campaign-respond');
+Route::post('/campaigns/uploads/presign', [UploadController::class, 'campaign'])->middleware('throttle:uploads');
+
+// Social share cards for link previews. Crawlers fetch these with plain GET
+// requests — no session, no auth — so they stay public.
+Route::get('/og-image.png', [SocialShareController::class, 'siteOgImage']);
+Route::get('/campaigns/{slug}/og-image.png', [SocialShareController::class, 'campaignOgImage']);
 
 Route::prefix('auth')->group(function (): void {
     // Brute-force / credential-stuffing / signup-spam guard: 5 per minute,
@@ -45,11 +57,6 @@ Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('/conversations/{conversation}/messages', [MessageController::class, 'store']);
         Route::post('/uploads/presign', [UploadController::class, 'chat'])->middleware('throttle:uploads');
     });
-
-    // Campaign participation is gated by campaign-specific blocks (checked in
-    // the controller), not by the site-wide chat pause.
-    Route::post('/campaigns/{slug}/respond', [CampaignController::class, 'respond'])->middleware('throttle:campaign-respond');
-    Route::post('/campaigns/uploads/presign', [UploadController::class, 'campaign'])->middleware('throttle:uploads');
 });
 
 Route::prefix('admin')->middleware(['auth:sanctum', 'role:admin'])->group(function (): void {

@@ -139,7 +139,11 @@ class AdminCampaignController extends Controller implements HasMiddleware
         return response()->noContent();
     }
 
-    /** Every response for one campaign, with the identity from their login. */
+    /**
+     * Every response for one campaign. Signed-in responses carry the identity
+     * from their login; guest responses are anonymous — shown as "Guest" with
+     * no email or avatar, and not blockable (blocks are keyed on accounts).
+     */
     public function responses(Campaign $campaign): JsonResponse
     {
         $campaign->load('options');
@@ -162,8 +166,10 @@ class AdminCampaignController extends Controller implements HasMiddleware
             'responses' => $responses->map(fn (CampaignResponse $response) => [
                 'id' => $response->id,
                 'user_id' => $response->user_id,
-                // Name and avatar come from the account they deliberately used.
-                'name' => $response->user?->name ?? 'Removed account',
+                'is_guest' => $response->user_id === null,
+                // Name and avatar come from the account they deliberately used;
+                // a guest has no account at all, so nothing is attached.
+                'name' => $response->user_id === null ? 'Guest' : ($response->user?->name ?? 'Removed account'),
                 'email' => $response->user?->email,
                 'avatar_url' => $response->user?->avatar_url,
                 'poll_option_id' => $response->poll_option_id,
@@ -176,7 +182,7 @@ class AdminCampaignController extends Controller implements HasMiddleware
                 'referral_source' => $response->referral_source,
                 'declared_name' => $response->declared_name,
                 'site_blocked' => $response->user?->blocked_at !== null,
-                'campaign_blocked' => in_array($response->user_id, $blockedUserIds, true),
+                'campaign_blocked' => $response->user_id !== null && in_array($response->user_id, $blockedUserIds, true),
                 'created_at' => optional($response->created_at)->toIso8601String(),
             ])->all(),
         ]);

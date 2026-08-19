@@ -126,9 +126,20 @@ through parameter binding. No issues found.
 - Campaign photo uploads reuse `UploadGuard`, not a reimplementation.
 - Campaign photos live under a private `campaigns/` prefix with no anonymous
   policy, reachable only via short-lived signed URLs.
-- `respond` enforces login, campaign window, campaign-specific blocks, and the
-  `respond` policy; a unique index plus a `UniqueConstraintViolationException`
-  catch makes one-response-per-user race-safe.
+- `respond` enforces the campaign window, campaign-specific blocks, and the
+  `respond` policy for signed-in accounts; a unique index plus a
+  `UniqueConstraintViolationException` catch makes one-response-per-user
+  race-safe.
+- Login is required for **polls** (one vote per person is only enforceable
+  per account). Open questions and photo requests may also be answered by
+  guests: guest submissions store a NULL `user_id` — no account, no name,
+  nothing traceable to a person — and cannot be campaign-blocked, since
+  blocking is keyed on accounts. Guest photos land under the shared private
+  `campaigns/guest/` folder; `respond` still verifies the key belongs to the
+  submission's own folder (per-account or guest) before accepting it.
+- Guest submissions are rate-limited by IP (`throttle:campaign-respond`
+  falls back to the client IP without an account); the presign endpoint is
+  likewise IP-limited for guests.
 
 ### ACTION REQUIRED — MinIO bucket policy on existing deployments
 

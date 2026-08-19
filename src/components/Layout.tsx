@@ -47,6 +47,7 @@ export default function Layout() {
             <NavLink to="/" className={navClass} end>{text('nav.home', 'Home')}</NavLink>
             <NavLink to="/gallery" className={navClass}>{text('nav.gallery', 'Gallery')}</NavLink>
             <Link to="/#favorites" className="nav-link">{text('nav.favorites', 'Favorites')}</Link>
+            <NavLink to="/support" className={navClass}>{text('nav.support', 'Support')}</NavLink>
           </nav>
 
           <div className="hidden items-center gap-2 md:flex">
@@ -94,6 +95,7 @@ export default function Layout() {
               <NavLink to="/" className="mobile-nav-link">{text('nav.home', 'Home')}</NavLink>
               <NavLink to="/gallery" className="mobile-nav-link">{text('nav.gallery', 'Gallery')}</NavLink>
               <Link to="/#favorites" className="mobile-nav-link">{text('nav.favorites', 'Favorites')}</Link>
+              <NavLink to="/support" className="mobile-nav-link">{text('nav.support', 'Support')}</NavLink>
               {user ? (
                 <>
                   {isAdmin && <NavLink to="/admin" className="mobile-nav-link">Studio</NavLink>}
@@ -124,11 +126,16 @@ export default function Layout() {
               © {new Date().getFullYear()} {profile?.display_name || text('brand.name', 'Field Notes')} {text('footer.copyright_suffix', '')}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            {profile && Object.entries(profile.social_links || {}).map(([name, url]) => {
-              const Icon = socialIcon(name);
-              return <a key={name} href={url} target="_blank" rel="noreferrer" className="icon-button" aria-label={name}><Icon size={17} /></a>;
-            })}
+          <div className="flex flex-col items-center gap-2.5 sm:items-end">
+            <div className="flex items-center gap-2">
+              {profile && Object.entries(profile.social_links || {}).map(([name, url]) => {
+                const Icon = socialIcon(name);
+                return <a key={name} href={url} target="_blank" rel="noreferrer" className="icon-button" aria-label={name}><Icon size={17} /></a>;
+              })}
+            </div>
+            <Link to="/support" className="text-xs font-medium transition-colors hover:underline" style={{ color: 'var(--moss)' }}>
+              {text('footer.support_link', 'Support & KHQR')}
+            </Link>
           </div>
         </div>
       </footer>

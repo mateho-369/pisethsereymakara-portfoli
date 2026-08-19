@@ -33,3 +33,4 @@ id_ed25519*
 .vercel
 vercel.json
 backend/vendor/
+.wrangler/state/

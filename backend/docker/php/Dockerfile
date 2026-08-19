@@ -8,7 +8,8 @@ RUN apk add --no-cache bash curl git curl-dev icu-dev libxml2-dev libzip-dev oni
         freetype-dev libpng-dev libjpeg-turbo-dev libwebp-dev ttf-dejavu $PHPIZE_DEPS \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install bcmath curl gd intl mbstring pcntl pdo_mysql simplexml zip \
-    && apk del $PHPIZE_DEPS freetype-dev libpng-dev libjpeg-turbo-dev libwebp-dev
+    && apk del $PHPIZE_DEPS freetype-dev libpng-dev libjpeg-turbo-dev libwebp-dev \
+    && apk add --no-cache freetype libpng libjpeg-turbo libwebp
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 WORKDIR /var/www/html
 COPY composer.json ./

@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { LoaderCircle, Plus, Save, Trash2, UploadCloud } from 'lucide-react';
+import { LoaderCircle, Plus, QrCode, Save, Trash2, UploadCloud, X } from 'lucide-react';
 import { api } from '../../lib/api';
 import { socialIcon, socialIconNames } from '../../lib/icons';
 import { useResource } from '../../lib/useResource';
@@ -15,6 +15,7 @@ export default function ProfilePanel() {
   const { success, error: toastError } = useToast();
   const { upload, uploading } = useUpload('media');
   const fileRef = useRef<HTMLInputElement>(null);
+  const qrFileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(() => api.profile.get(), []);
   const { data, loading, error, reload } = useResource<Profile | null>(load, null);
@@ -23,6 +24,7 @@ export default function ProfilePanel() {
   const [links, setLinks] = useState<LinkRow[]>([]);
   const [synced, setSynced] = useState<Profile | null>(null);
   const [saving, setSaving] = useState(false);
+  const [uploadingQr, setUploadingQr] = useState(false);
 
   // Adopt server data during render so the form never flashes empty.
   if (data && synced !== data) {
@@ -49,6 +51,21 @@ export default function ProfilePanel() {
     }
   };
 
+  const pickQr = async (file?: File) => {
+    if (!file) return;
+    setUploadingQr(true);
+    try {
+      const uploaded = await upload(file);
+      set({ support_qr_url: uploaded.url });
+      success('KHQR image uploaded. Remember to save.');
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : 'The KHQR image could not be uploaded.');
+    } finally {
+      setUploadingQr(false);
+      if (qrFileRef.current) qrFileRef.current.value = '';
+    }
+  };
+
   const save = async () => {
     setSaving(true);
     try {
@@ -56,7 +73,12 @@ export default function ProfilePanel() {
         if (icon.trim() && url.trim()) acc[icon.trim()] = url.trim();
         return acc;
       }, {});
-      await api.profile.update({ ...form, social_links });
+      await api.profile.update({
+        ...form,
+        social_links,
+        support_qr_url: form.support_qr_url?.trim() || null,
+        support_caption: form.support_caption?.trim() || null,
+      });
       await reload();
       success('Your profile is updated.');
     } catch (err) {
@@ -94,11 +116,96 @@ export default function ProfilePanel() {
         <TextField label="Quote" multiline rows={3} value={form.quote} onChange={(v) => set({ quote: v })} hint="Shown beside your portrait, in quotation marks." />
       </div>
 
+      {/* Support / KHQR Section */}
+      <div className="admin-card">
+        <div>
+          <h2 className="font-serif text-2xl" style={{ color: 'var(--ink)' }}>Support & KHQR</h2>
+          <p className="mt-1 text-sm" style={{ color: 'var(--ink-3)' }}>
+            Upload your personal KHQR code from your Bakong or banking app. Displayed on the <code className="rounded px-1.5 py-0.5 text-xs" style={{ background: 'var(--bg-muted)' }}>/support</code> page alongside your links.
+          </p>
+        </div>
+
+        <div className="mt-5 flex flex-col gap-6 sm:flex-row">
+          <div className="shrink-0 text-center">
+            {form.support_qr_url ? (
+              <div className="relative inline-block">
+                <img
+                  src={form.support_qr_url}
+                  alt="KHQR Code preview"
+                  className="mx-auto h-40 w-40 rounded-2xl border object-contain p-2"
+                  style={{ borderColor: 'var(--border-soft)', background: '#FFFFFF', boxShadow: 'var(--shadow-md)' }}
+                />
+                <button
+                  onClick={() => set({ support_qr_url: null })}
+                  className="absolute -right-2 -top-2 grid h-7 w-7 place-items-center rounded-full text-white shadow-sm transition-transform hover:scale-110"
+                  style={{ background: '#A64B3B' }}
+                  title="Remove KHQR image"
+                  aria-label="Remove KHQR image"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <div
+                className="grid h-40 w-40 place-items-center rounded-2xl border border-dashed"
+                style={{ borderColor: 'var(--border-strong)', background: 'var(--bg-muted)', color: 'var(--ink-4)' }}
+              >
+                <div className="flex flex-col items-center gap-1.5 p-3 text-center">
+                  <QrCode size={32} strokeWidth={1.5} />
+                  <span className="text-xs">No KHQR image</span>
+                </div>
+              </div>
+            )}
+
+            <input
+              ref={qrFileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(event) => pickQr(event.target.files?.[0])}
+            />
+            <div className="mt-3 flex items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => qrFileRef.current?.click()}
+                disabled={uploadingQr}
+                className="btn-outline !px-4 !py-2 text-xs"
+              >
+                {uploadingQr ? <LoaderCircle className="animate-spin" size={14} /> : <UploadCloud size={14} />}
+                {form.support_qr_url ? 'Replace QR' : 'Upload KHQR'}
+              </button>
+            </div>
+          </div>
+
+          <div className="grid flex-1 gap-4">
+            <TextField
+              label="Support caption / note"
+              multiline
+              rows={3}
+              value={form.support_caption || ''}
+              placeholder="If this helped you or you enjoy my work, buying me a coffee or sending support means a lot 🙏"
+              onChange={(v) => set({ support_caption: v })}
+              hint="Shown directly below your KHQR code on the /support page."
+            />
+            <TextField
+              label="KHQR Image URL"
+              type="url"
+              value={form.support_qr_url || ''}
+              placeholder="https://"
+              onChange={(v) => set({ support_qr_url: v })}
+              hint="Uploading above fills this in automatically, or you can paste a direct image URL."
+            />
+          </div>
+        </div>
+      </div>
+
       <div className="admin-card">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="font-serif text-2xl" style={{ color: 'var(--ink)' }}>Links</h2>
-            <p className="mt-1 text-sm" style={{ color: 'var(--ink-3)' }}>Shown as icons in the footer. Use https://, mailto: or tel:.</p>
+            <p className="mt-1 text-sm" style={{ color: 'var(--ink-3)' }}>
+              Shown in the footer and on your <code className="rounded px-1.5 py-0.5 text-xs" style={{ background: 'var(--bg-muted)' }}>/support</code> page. Use https://, mailto: or tel:.
+            </p>
           </div>
           <button onClick={() => setLinks([...links, { icon: 'website', url: '' }])} className="btn-outline !px-4 !py-2 text-xs"><Plus size={14} /> Add</button>
         </div>

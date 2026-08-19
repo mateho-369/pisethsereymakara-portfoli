@@ -1,1 +1,43 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="18" fill="#F8F4E9"/><path d="M13 39h38" stroke="#6E7C52" stroke-width="3" stroke-linecap="round"/><path d="M20 39c5-13 19-17 27-5" fill="none" stroke="#5C7A89" stroke-width="3" stroke-linecap="round"/><circle cx="32" cy="31" r="8" fill="#D9A441"/><path d="M13 43h38" stroke="#D9A441" stroke-width="2" stroke-linecap="round" opacity=".7"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <style>
+      :root {
+        --bg-fill: #F8F4E9;
+        --border-color: rgba(110, 124, 82, 0.45);
+        --text-fill: #23281E;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg-fill: #1E241C;
+          --border-color: rgba(217, 164, 65, 0.45);
+          --text-fill: #E8EDE4;
+        }
+      }
+    </style>
+    <linearGradient id="logo-horizon" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#6E7C52" />
+      <stop offset="50%" stop-color="#D9A441" />
+      <stop offset="100%" stop-color="#5C7A89" />
+    </linearGradient>
+  </defs>
+
+  <!-- Circular background badge matching header logo -->
+  <circle cx="100" cy="100" r="92" fill="var(--bg-fill)" stroke="var(--border-color)" stroke-width="4" />
+
+  <!-- Fraunces / Serif M mark -->
+  <text
+    x="100"
+    y="128"
+    text-anchor="middle"
+    font-family="'Fraunces', Georgia, 'DejaVu Serif', 'Times New Roman', serif"
+    font-size="100"
+    font-weight="600"
+    fill="var(--text-fill)"
+  >M</text>
+
+  <!-- Horizon gradient line -->
+  <line x1="38" y1="148" x2="162" y2="148" stroke="url(#logo-horizon)" stroke-width="5" stroke-linecap="round" />
+
+  <!-- Gold glow dot -->
+  <circle cx="100" cy="145" r="4.5" fill="#D9A441" opacity="0.9" />
+</svg>

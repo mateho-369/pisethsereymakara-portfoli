@@ -61,6 +61,7 @@ class SiteContent
                 'nav.home' => ['Nav · home', 'text', 'Home', ''],
                 'nav.gallery' => ['Nav · gallery', 'text', 'Gallery', ''],
                 'nav.favorites' => ['Nav · favorites', 'text', 'Favorites', ''],
+                'nav.support' => ['Nav · support', 'text', 'Support', ''],
                 'nav.sign_in' => ['Nav · sign in', 'text', 'Sign in', ''],
                 'nav.sign_up' => ['Nav · sign up button', 'text', 'Say hello', ''],
                 'nav.inbox' => ['Nav · owner inbox', 'text', 'Inbox', ''],
@@ -132,6 +133,20 @@ class SiteContent
             'Footer' => [
                 'footer.tagline' => ['Tagline', 'text', 'Made slowly, shared warmly.', ''],
                 'footer.copyright_suffix' => ['Line after the year', 'text', '', 'Optional note beside the copyright line.'],
+                'footer.support_link' => ['Support link label', 'text', 'Support & KHQR', ''],
+            ],
+
+            'Support page' => [
+                'support.eyebrow' => ['Eyebrow', 'text', 'Support & Connect', ''],
+                'support.title' => ['Heading', 'text', 'Support this work', ''],
+                'support.subtitle' => ['Intro subtitle', 'textarea', 'Made slowly, shared warmly. If my photographs, field notes, or projects have brought you peace or inspiration, here are ways to support.', ''],
+                'support.qr_card_title' => ['QR card title', 'text', 'KHQR Support', ''],
+                'support.default_caption' => ['Default QR caption', 'textarea', 'If this space or any of my work helped or inspired you, buying me a coffee or sending a kind tip means a lot 🙏', ''],
+                'support.links_title' => ['Links section title', 'text', 'Connect & Follow', ''],
+                'support.links_subtitle' => ['Links section subtitle', 'text', 'Follow my work and updates across the web', ''],
+                'support.chat_title' => ['Chat card title', 'text', 'Send a kind note', ''],
+                'support.chat_body' => ['Chat card body', 'textarea', 'A few warm words or questions are just as appreciated as a coffee.', ''],
+                'support.chat_cta' => ['Chat card button', 'text', 'Say hello in chat', ''],
             ],
 
             'Seasonal theme' => [

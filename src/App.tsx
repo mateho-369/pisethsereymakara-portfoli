@@ -13,6 +13,7 @@ const AuthPage = lazy(() => import('./pages/AuthPage'));
 const ChatPage = lazy(() => import('./pages/ChatPage'));
 const GalleryPage = lazy(() => import('./pages/GalleryPage'));
 const HomePage = lazy(() => import('./pages/HomePage'));
+const SupportPage = lazy(() => import('./pages/SupportPage'));
 const CampaignPage = lazy(() => import('./pages/CampaignPage'));
 const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'));
 const CampaignsPanel = lazy(() => import('./pages/admin/CampaignsPanel'));
@@ -33,6 +34,7 @@ export default function App() {
   return <ThemeProvider><BrowserRouter><AuthProvider><ContentProvider><ToastProvider><Suspense fallback={<LoadingState label="Opening the page…" />}><Routes>
     <Route element={<Layout />}>
       <Route path="/" element={<HomePage />} /><Route path="/gallery" element={<GalleryPage />} />
+      <Route path="/support" element={<SupportPage />} />
       <Route path="/login" element={<AuthPage mode="login" />} /><Route path="/signup" element={<AuthPage mode="signup" />} />
       <Route path="/ask/:slug" element={<CampaignPage />} />
       <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />

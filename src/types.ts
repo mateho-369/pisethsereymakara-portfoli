@@ -10,6 +10,8 @@ export interface Profile {
   email: string;
   avatar_url: string;
   social_links: SocialLinks;
+  support_qr_url?: string | null;
+  support_caption?: string | null;
 }
 
 export type SettingType = 'text' | 'textarea' | 'url';

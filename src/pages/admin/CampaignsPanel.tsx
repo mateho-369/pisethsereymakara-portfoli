@@ -175,7 +175,8 @@ export default function CampaignsPanel() {
         <div className="admin-card text-center">
           <p className="font-serif text-xl" style={{ color: 'var(--ink)' }}>No campaigns yet</p>
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed" style={{ color: 'var(--ink-3)' }}>
-            Create one, copy the link, and put it in your story. People sign in, answer once, and you see who said what.
+            Create one, copy the link, and put it in your story. People answer with their account or as a guest,
+            and you see everything they send.
           </p>
         </div>
       ) : (
@@ -405,6 +406,7 @@ function ResponsesView({ campaignId, onBack }: { campaignId: number; onBack: () 
   };
 
   const block = async (response: AdminCampaignResponse, everywhere: boolean) => {
+    if (response.user_id === null) return; // guests have no account to block
     try {
       await api.admin.campaignBlocks.create(response.user_id, everywhere ? null : campaign.id);
       await reload();
@@ -486,6 +488,9 @@ function ResponsesView({ campaignId, onBack }: { campaignId: number; onBack: () 
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>{response.name}</p>
+                    {response.is_guest && (
+                      <span className="admin-chip" style={{ background: 'var(--border-soft)', color: 'var(--ink-3)' }}>guest · no account</span>
+                    )}
                     {response.declared_name && response.declared_name !== response.name && (
                       <span className="admin-chip" style={{ background: 'var(--border-soft)', color: 'var(--ink-3)' }}>calls themself “{response.declared_name}”</span>
                     )}
@@ -536,8 +541,12 @@ function ResponsesView({ campaignId, onBack }: { campaignId: number; onBack: () 
 
                 <KebabMenu
                   actions={[
-                    { label: 'Block from this campaign', icon: <Ban size={15} />, onClick: () => void block(response, false) },
-                    { label: 'Block from all campaigns', icon: <Ban size={15} />, onClick: () => void block(response, true) },
+                    // Blocking is keyed on accounts; a guest has none, so
+                    // there is nothing to block. Deletion still works.
+                    ...(response.is_guest ? [] : [
+                      { label: 'Block from this campaign', icon: <Ban size={15} />, onClick: () => void block(response, false) },
+                      { label: 'Block from all campaigns', icon: <Ban size={15} />, onClick: () => void block(response, true) },
+                    ]),
                     { label: 'Delete response', icon: <Trash2 size={15} />, danger: true, onClick: () => setRemoving(response) },
                   ]}
                 />

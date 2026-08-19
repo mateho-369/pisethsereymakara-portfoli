@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
-  CalendarClock, Camera, CheckCircle2, ImageUp, Lock, MessageSquareQuote,
+  CalendarClock, Camera, CheckCircle2, Ghost, ImageUp, Lock, MessageSquareQuote,
   ShieldCheck, Vote,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -11,7 +11,7 @@ import { useResource } from '../lib/useResource';
 import { MAX_UPLOAD_BYTES, sizeLabel } from '../lib/useUpload';
 import { useToast } from '../components/ui/Toast';
 import LoadingState from '../components/LoadingState';
-import type { CampaignState, PublicCampaign } from '../types';
+import type { CampaignState, MyCampaignResponse, PublicCampaign } from '../types';
 
 const REFERRAL_LABELS: Record<string, string> = {
   instagram: 'Instagram',
@@ -55,6 +55,14 @@ export default function CampaignPage() {
   const [declaredName, setDeclaredName] = useState('');
   const [photo, setPhoto] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
+  /**
+   * True once a signed-out visitor chooses "Continue as guest" on a question
+   * or photo campaign. Purely local: a guest has no account, so nothing about
+   * this choice is ever stored or traceable.
+   */
+  const [guest, setGuest] = useState(false);
+  /** This visit's own confirmation — guests have no stored "my response". */
+  const [lastSubmitted, setLastSubmitted] = useState<MyCampaignResponse | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const returnTo = `/ask/${slug}`;
@@ -76,27 +84,37 @@ export default function CampaignPage() {
   }
 
   const mine = campaign.my_response;
+  // For accounts this is their stored submission; for guests it is just the
+  // confirmation of what they sent during this visit (nothing is linked).
+  const submitted = mine ?? lastSubmitted;
   const canEdit = campaign.is_open && (!mine || campaign.allow_updates);
+  // Guests exist only for question and photo campaigns, never polls.
+  const isGuestSubmitting = !user && guest && campaign.allows_guests && campaign.is_open;
 
   const submit = async () => {
     setBusy(true);
     try {
       const shared = {
         referral_source: referral || null,
-        declared_name: declaredName.trim() || null,
+        // Guests send no name at all — the server drops it for them too.
+        declared_name: isGuestSubmitting ? null : declaredName.trim() || null,
       };
 
       if (campaign.type === 'poll') {
         if (!choice) throw new Error('Please choose one option first.');
         const result = await api.campaigns.respond(slug, { ...shared, poll_option_id: choice });
         setData(result.campaign);
+        setLastSubmitted(result.response);
         success('Your vote is in. Thank you.');
       } else if (campaign.type === 'question') {
         if (answer.trim().length < 2) throw new Error('Please write a short reply first.');
         const result = await api.campaigns.respond(slug, { ...shared, answer_text: answer.trim() });
         setData(result.campaign);
+        setLastSubmitted(result.response);
         setAnswer('');
-        success('Your reply has been sent — only the owner can read it.');
+        success(isGuestSubmitting
+          ? 'Your reply has been sent as a guest — only the owner can read it.'
+          : 'Your reply has been sent — only the owner can read it.');
       } else {
         if (!photo) throw new Error('Please choose a photo first.');
         if (photo.size > MAX_UPLOAD_BYTES) throw new Error('Please choose a photo smaller than 4 MB.');
@@ -108,10 +126,13 @@ export default function CampaignPage() {
           answer_text: answer.trim() || undefined,
         });
         setData(result.campaign);
+        setLastSubmitted(result.response);
         setPhoto(null);
         setAnswer('');
         if (fileInput.current) fileInput.current.value = '';
-        success('Your photo has been sent privately to the owner.');
+        success(isGuestSubmitting
+          ? 'Your photo has been sent privately to the owner, as a guest.'
+          : 'Your photo has been sent privately to the owner.');
       }
     } catch (err) {
       toastError(err instanceof Error ? err.message : 'That could not be sent.');
@@ -165,18 +186,35 @@ export default function CampaignPage() {
             </div>
           )}
 
-          {/* Signed-out: an explicit, knowing login. Never anonymous tracking. */}
+          {/*
+            Signed-out: an explicit, knowing login — or, for question and
+            photo campaigns only, a guest path that attaches no identity at
+            all. Polls keep the login-only path unchanged.
+          */}
           {!user && campaign.is_open && (
             <div className="mt-8 rounded-2xl p-5" style={{ background: 'var(--bg)', border: '1px solid var(--border-soft)' }}>
               <p className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--ink)' }}>
-                <ShieldCheck size={16} style={{ color: 'var(--moss)' }} /> Please sign in to respond
+                <ShieldCheck size={16} style={{ color: 'var(--moss)' }} />
+                {campaign.allows_guests ? 'Sign in, or continue as a guest' : 'Please sign in to respond'}
               </p>
-              <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--ink-3)' }}>
-                Your name and picture from the account you choose are shown to the owner, so everyone here is accountable
-                for what they send. Nothing else about you is collected.
-              </p>
+              {campaign.allows_guests ? (
+                <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--ink-3)' }}>
+                  Sign in and the owner sees your name and picture, so everyone here is accountable for what they send.
+                  Continue as a guest and nothing about you is attached — no name, no account, nothing that traces back to you.
+                </p>
+              ) : (
+                <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--ink-3)' }}>
+                  Your name and picture from the account you choose are shown to the owner, so everyone here is accountable
+                  for what they send. Nothing else about you is collected.
+                </p>
+              )}
               <div className="mt-5 flex flex-wrap gap-2">
-                <button onClick={() => signInWithGoogle(returnTo)} className="btn-primary !py-2.5">Continue with Google</button>
+                {campaign.allows_guests && (
+                  <button onClick={() => setGuest(true)} className="btn-primary flex items-center gap-2 !py-2.5">
+                    <Ghost size={15} /> Continue as guest
+                  </button>
+                )}
+                <button onClick={() => signInWithGoogle(returnTo)} className={`${campaign.allows_guests ? 'btn-outline' : 'btn-primary'} !py-2.5`}>Continue with Google</button>
                 <button onClick={() => navigate('/login', { state: { from: returnTo } })} className="btn-outline !py-2.5">Use email instead</button>
               </div>
             </div>
@@ -195,31 +233,48 @@ export default function CampaignPage() {
             </div>
           )}
 
-          {/* Already answered */}
-          {mine && (
+          {/* Guest: no account at all, so nothing about them is attached. */}
+          {isGuestSubmitting && (
+            <div className="mt-8 flex items-center gap-3 rounded-2xl p-4" style={{ background: 'var(--bg)', border: '1px solid var(--border-soft)' }}>
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full" style={{ background: 'rgba(110,124,82,.12)', color: 'var(--moss)' }}>
+                <Ghost size={18} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium" style={{ color: 'var(--ink)' }}>Sending as a guest</p>
+                <p className="mt-0.5 text-xs" style={{ color: 'var(--ink-4)' }}>
+                  No name, no account — nothing about you is attached.{' '}
+                  <button onClick={() => setGuest(false)} className="text-link">Prefer to sign in?</button>
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Already answered (accounts: their stored row; guests: this visit's confirmation) */}
+          {submitted && (
             <div className="mt-5 rounded-2xl p-5" style={{ background: 'rgba(110,124,82,.09)', border: '1px solid var(--border-soft)' }}>
               <p className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--moss)' }}>
                 <CheckCircle2 size={16} /> Your response was received
               </p>
-              {campaign.type === 'question' && mine.answer_text && (
-                <p className="mt-2.5 text-sm leading-relaxed" style={{ color: 'var(--ink-2)' }}>“{mine.answer_text}”</p>
+              {campaign.type === 'question' && submitted.answer_text && (
+                <p className="mt-2.5 text-sm leading-relaxed" style={{ color: 'var(--ink-2)' }}>“{submitted.answer_text}”</p>
               )}
-              {campaign.type === 'photo' && mine.photo_url && (
+              {campaign.type === 'photo' && submitted.photo_url && (
                 <>
-                  <img src={mine.photo_url} alt="Your submission" className="mt-3 max-h-64 w-full rounded-xl object-cover" />
+                  <img src={submitted.photo_url} alt="Your submission" className="mt-3 max-h-64 w-full rounded-xl object-cover" />
                   <p className="mt-2 text-xs" style={{ color: 'var(--ink-4)' }}>
-                    Private — only you and the owner can see this. Status: {mine.moderation_status}.
+                    Private — only you and the owner can see this. Status: {submitted.moderation_status}.
                   </p>
                 </>
               )}
-              {campaign.allow_updates && campaign.is_open && (
+              {/* Replacing is an account concept: guests have no row to replace. */}
+              {mine && campaign.allow_updates && campaign.is_open && (
                 <p className="mt-2 text-xs" style={{ color: 'var(--ink-4)' }}>You may replace it below.</p>
               )}
             </div>
           )}
 
-          {/* The form */}
-          {user && canEdit && !campaign.is_blocked && (
+          {/* The form. Polls: signed-in accounts only. Question/photo: accounts or guests. */}
+          {(user ? canEdit : isGuestSubmitting) && !campaign.is_blocked && (
             <div className="mt-7 space-y-5">
               {campaign.type === 'poll' && (
                 <div className="space-y-2.5">
@@ -314,12 +369,15 @@ export default function CampaignPage() {
                       );
                     })}
                   </div>
-                  <label className="mt-3 block">
-                    <span className="field-label">What should the owner call you? (optional)</span>
-                    <input className="input-field mt-2" maxLength={80} value={declaredName} placeholder={user?.name || 'Your name'} onChange={(event) => setDeclaredName(event.target.value)} />
-                  </label>
+                  {/* Guests send no name of any kind — there is no identity to attach. */}
+                  {!isGuestSubmitting && (
+                    <label className="mt-3 block">
+                      <span className="field-label">What should the owner call you? (optional)</span>
+                      <input className="input-field mt-2" maxLength={80} value={declaredName} placeholder={user?.name || 'Your name'} onChange={(event) => setDeclaredName(event.target.value)} />
+                    </label>
+                  )}
                   <p className="mt-2 text-xs" style={{ color: 'var(--ink-4)' }}>
-                    Both are optional — skip them and simply send.
+                    {isGuestSubmitting ? 'Optional — skip it and simply send.' : 'Both are optional — skip them and simply send.'}
                   </p>
                 </div>
               )}
@@ -361,7 +419,8 @@ export default function CampaignPage() {
         </div>
 
         <p className="mt-6 text-center text-xs leading-relaxed" style={{ color: 'var(--ink-4)' }}>
-          This page never tries to work out who you are. Nothing is recorded unless you sign in and send it yourself.
+          This page never tries to work out who you are. Nothing is recorded unless you send it yourself — and a guest
+          sends it with no name or account attached.
         </p>
       </div>
     </div>

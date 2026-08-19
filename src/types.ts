@@ -145,6 +145,8 @@ export interface PublicCampaign {
   start_date: string | null;
   end_date: string | null;
   allow_updates: boolean;
+  /** True for question and photo campaigns — polls require an account. */
+  allows_guests: boolean;
   ask_referral: boolean;
   referral_sources: string[];
   options: CampaignOption[];
@@ -174,10 +176,15 @@ export interface AdminCampaign {
   created_at: string | null;
 }
 
-/** Owner view of a response, including the identity from their login. */
+/**
+ * Owner view of a response. Signed-in responses include the identity from
+ * their login; guest responses (question/photo campaigns only) are anonymous.
+ */
 export interface AdminCampaignResponse {
   id: number;
-  user_id: number;
+  /** null when the response came from a guest (no account). */
+  user_id: number | null;
+  is_guest: boolean;
   name: string;
   email: string | null;
   avatar_url: string | null;

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, Eye, EyeOff, LoaderCircle, Pencil, Star, Trash2, UploadCloud } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useResource } from '../../lib/useResource';
@@ -25,6 +25,10 @@ export default function MediaPanel() {
   const { success, error: toastError } = useToast();
   const load = useCallback(() => api.media.list(true), []);
   const { data: items, setData, loading, error, reload } = useResource<MediaItem[]>(load, []);
+  const categorySuggestions = useMemo(
+    () => [...new Set(items.map((item) => item.category).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [items]
+  );
 
   const { upload, uploadMedia, uploading } = useUpload('media');
   const replaceRef = useRef<HTMLInputElement>(null);
@@ -124,7 +128,7 @@ export default function MediaPanel() {
 
   return (
     <div className="space-y-5">
-      <PostComposer onPublished={reload} />
+      <PostComposer onPublished={reload} suggestions={categorySuggestions} />
 
       <section className="admin-card">
         {items.map((item, index) => (

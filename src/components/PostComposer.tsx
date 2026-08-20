@@ -5,8 +5,7 @@ import { api } from '../lib/api';
 import { useUpload } from '../lib/useUpload';
 import { useToast } from './ui/Toast';
 import MediaThumbnail from './MediaThumbnail';
-
-const moodTags = ['Field Notes', 'Quiet Places', 'Small Rituals', 'Horizons', 'Home', 'Adventures', 'Golden Hour', 'City Life'];
+import CategoryPicker from './CategoryPicker';
 
 interface PendingFile {
   id: string;
@@ -18,12 +17,15 @@ interface PendingFile {
 
 interface PostComposerProps {
   onPublished: () => void;
+  /** Categories already used in the gallery — offered as one-click chips. */
+  suggestions?: string[];
 }
 
-export default function PostComposer({ onPublished }: PostComposerProps) {
+export default function PostComposer({ onPublished, suggestions = [] }: PostComposerProps) {
   const { success, error: toastError } = useToast();
   const { uploadMedia, uploading, progress } = useUpload('media');
   const fileRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
 
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [category, setCategory] = useState('Field Notes');
@@ -68,7 +70,7 @@ export default function PostComposer({ onPublished }: PostComposerProps) {
         await api.media.create({
           title: pending.title || 'Untitled',
           description: pending.description,
-          category,
+          category: category.trim() || 'Field Notes',
           media_type: uploaded.isVideo ? 'video' : 'photo',
           thumbnail_url: uploaded.thumbnailUrl,
           media_url: uploaded.url,
@@ -143,17 +145,20 @@ export default function PostComposer({ onPublished }: PostComposerProps) {
 
           <button
             onClick={() => fileRef.current?.click()}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => { e.preventDefault(); setDragOver(false); addFiles(e.dataTransfer.files); }}
             className="mt-4 flex min-h-32 w-full flex-col items-center justify-center rounded-2xl border border-dashed p-6 text-center transition hover:border-[var(--moss)]"
-            style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}
+            style={{ borderColor: dragOver ? 'var(--moss)' : 'var(--border)', background: 'var(--bg)' }}
           >
             <span className="grid h-11 w-11 place-items-center rounded-full" style={{ background: 'var(--gold-pale)', color: 'var(--gold-deep)' }}>
               <UploadCloud size={20} />
             </span>
             <strong className="mt-3 font-serif text-lg" style={{ color: 'var(--ink)' }}>
-              Choose images or films
+              Choose or drop images or films
             </strong>
             <span className="mt-1 text-xs" style={{ color: 'var(--ink-3)' }}>
-              Select multiple files · Up to 4 MB each
+              Multiple files · Drag & drop or click · Up to 4 MB each
             </span>
           </button>
           <input
@@ -165,29 +170,15 @@ export default function PostComposer({ onPublished }: PostComposerProps) {
             onChange={(e) => { addFiles(e.target.files); if (fileRef.current) fileRef.current.value = ''; }}
           />
 
-          {/* Mood / Category */}
+          {/* Mood / Category — one-click chips or any custom category */}
           <div className="mt-4">
-            <span className="field-label">Mood / Category</span>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {moodTags.map((tag) => (
-                <motion.button
-                  key={tag}
-                  whileHover={{ scale: 1.04 }}
-                  whileTap={{ scale: 0.96 }}
-                  onClick={() => setCategory(tag)}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-                    category === tag ? 'border-transparent text-white' : ''
-                  }`}
-                  style={{
-                    background: category === tag ? 'var(--fjord)' : 'var(--bg)',
-                    borderColor: category === tag ? 'transparent' : 'var(--border)',
-                    color: category === tag ? '#F8F4E9' : 'var(--ink-3)',
-                  }}
-                >
-                  {tag}
-                </motion.button>
-              ))}
-            </div>
+            <CategoryPicker
+              label="Mood / Category"
+              value={category}
+              onChange={setCategory}
+              suggestions={suggestions}
+              hint="Pick a mood or type any category you like — it applies to every file in this batch."
+            />
           </div>
         </div>
 

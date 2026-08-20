@@ -123,8 +123,16 @@ class CampaignOgImage
             }
         } else {
             // Site card: the site's own eyebrow copy as the centrepiece.
-            imagefttext($image, 72, 0, $left, 300, $ink, $serifItalic, 'A quiet corner of the internet.');
-            imagefttext($image, 30, 0, $left, 380, $ink3, $sans, 'Piseth Serey Makara · Field Notes');
+            // Wrapped and sized conservatively (same helper campaign cards
+            // use) so it survives aggressive crops in Messenger/WhatsApp,
+            // which don't always respect the full 1200x630 canvas.
+            $safeWidth = self::WIDTH - 320; // wider margins than campaign cards
+            $taglineY = 280;
+            foreach (self::wrapText($image, 'A quiet corner of the internet.', $serifItalic, 56, $safeWidth, 2) as $line) {
+                imagefttext($image, 56, 0, $left, $taglineY, $ink, $serifItalic, $line);
+                $taglineY += 70;
+            }
+            imagefttext($image, 30, 0, $left, $taglineY + 30, $ink3, $sans, 'Piseth Serey Makara · Field Notes');
         }
 
         // Footer hairline and line: where to find it, and the house note.

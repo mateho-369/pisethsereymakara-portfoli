@@ -41,6 +41,11 @@ class MediaController extends Controller
             'sort_order' => ['sometimes', 'integer', 'min:0'],
         ]);
 
+        // The DB column defaults to '' and is NOT NULL, but validation allows
+        // null through (and Laravel's ConvertEmptyStringsToNull turns "" into
+        // null before we ever see it) -- coerce back or the insert 500s.
+        $validated['description'] ??= '';
+
         // Presigned PUTs cannot cap size, so verify the real bytes in storage
         // before we keep a row pointing at them.
         $bytes = UploadGuard::verifyUrl($validated['media_url'], 'media_url');
@@ -72,6 +77,12 @@ class MediaController extends Controller
             'is_public' => ['sometimes', 'boolean'],
             'sort_order' => ['sometimes', 'integer', 'min:0'],
         ]);
+
+        // Same null-vs-empty-string fix as store(), only when the field was
+        // actually sent (the rule is "sometimes").
+        if (array_key_exists('description', $validated) && $validated['description'] === null) {
+            $validated['description'] = '';
+        }
 
         // Verify any newly swapped-in file, same as on create.
         if (array_key_exists('media_url', $validated) && $validated['media_url'] !== $media->media_url) {

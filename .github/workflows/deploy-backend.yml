@@ -22,7 +22,8 @@ jobs:
           script: |
             set -e
             cd ~/pisethsereymakara-portfoli
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
             docker compose -p personal-portfoli-makara-mateho -f docker-compose.prod.yml up -d --build
             docker compose -p personal-portfoli-makara-mateho -f docker-compose.prod.yml exec -T app php artisan migrate --force
             docker compose -p personal-portfoli-makara-mateho -f docker-compose.prod.yml exec -T app php artisan config:clear

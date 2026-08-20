@@ -33,6 +33,7 @@ Route::post('/campaigns/uploads/presign', [UploadController::class, 'campaign'])
 // Social share cards for link previews. Crawlers fetch these with plain GET
 // requests — no session, no auth — so they stay public.
 Route::get('/og-image.png', [SocialShareController::class, 'siteOgImage']);
+Route::get('/support/og-image.png', [SocialShareController::class, 'supportOgImage']);
 Route::get('/campaigns/{slug}/og-image.png', [SocialShareController::class, 'campaignOgImage']);
 
 Route::prefix('auth')->group(function (): void {

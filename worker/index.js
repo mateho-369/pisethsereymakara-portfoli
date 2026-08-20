@@ -45,11 +45,54 @@ export default {
 
         return injected ?? shell;
       }
+
+      if (url.pathname === '/support' || url.pathname === '/support/') {
+        const shell = await env.ASSETS.fetch(request);
+        const injected = await injectSupportOgTags(shell, url);
+
+        return injected ?? shell;
+      }
     }
 
     return env.ASSETS.fetch(request);
   },
 };
+
+async function injectSupportOgTags(shell, url) {
+  if (shell.status !== 200) return null;
+
+  let html;
+  try {
+    html = await shell.text();
+  } catch {
+    return null;
+  }
+
+  if (!html.includes('</head>')) return null;
+
+  html = html.replace(/<meta\b[^>]*(?:property="og:|name="twitter:)[^>]*>/gi, '');
+  html = html.replace(/<title>[\s\S]*?<\/title>/, '<title>Support this work \u2014 Field Notes</title>');
+
+  const tags = [
+    `<meta property="og:type" content="website" />`,
+    `<meta property="og:site_name" content="Field Notes" />`,
+    `<meta property="og:title" content="Support this work" />`,
+    `<meta property="og:description" content="If this space has brought you peace or inspiration, here are ways to support it." />`,
+    `<meta property="og:url" content="${escapeHtml(url.href)}" />`,
+    `<meta property="og:image" content="${escapeHtml(`${url.origin}/api/support/og-image.png`)}" />`,
+    `<meta name="twitter:card" content="summary_large_image" />`,
+  ].join('\n    ');
+
+  html = html.replace('</head>', `    ${tags}\n  </head>`);
+
+  return new Response(html, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-cache',
+    },
+  });
+}
 
 /**
  * Take the plain SPA shell a crawler fetched for /ask/{slug} and splice real

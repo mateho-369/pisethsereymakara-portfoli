@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Campaign;
+use App\Models\PortfolioProfile;
 use RuntimeException;
 
 /**
@@ -32,6 +33,136 @@ class CampaignOgImage
     public static function siteCard(): string
     {
         return self::render(null);
+    }
+
+    /** The site card, personalised: the owner's photo, name, role, and quote. */
+    public static function profileCard(PortfolioProfile $profile): string
+    {
+        if (! function_exists('imagecreatetruecolor')) {
+            throw new RuntimeException('The GD extension is not available in this PHP build.');
+        }
+
+        $serif = self::font([
+            '/usr/share/fonts/dejavu/DejaVuSerif-Bold.ttf',
+            '/usr/share/fonts/ttf-dejavu/DejaVuSerif-Bold.ttf',
+        ]);
+        $serifItalic = self::font([
+            '/usr/share/fonts/dejavu/DejaVuSerif-Italic.ttf',
+            '/usr/share/fonts/ttf-dejavu/DejaVuSerif-Italic.ttf',
+            $serif,
+        ]);
+        $sans = self::font([
+            '/usr/share/fonts/dejavu/DejaVuSans.ttf',
+            '/usr/share/fonts/ttf-dejavu/DejaVuSans.ttf',
+        ]);
+        $mono = self::font([
+            '/usr/share/fonts/dejavu/DejaVuSansMono.ttf',
+            '/usr/share/fonts/ttf-dejavu/DejaVuSansMono.ttf',
+            $sans,
+        ]);
+
+        $image = imagecreatetruecolor(self::WIDTH, self::HEIGHT);
+        $surface = self::color($image, self::SURFACE);
+        $ink = self::color($image, self::INK);
+        $ink2 = self::color($image, self::INK_2);
+        $ink3 = self::color($image, self::INK_3);
+        $moss = self::color($image, self::MOSS);
+        $hairline = self::mix($image, self::SURFACE, self::MOSS, 0.28);
+
+        imagefill($image, 0, 0, $surface);
+        self::drawHorizon($image);
+        imagefttext($image, 40, 0, 80, 108, $ink, $serif, 'Field Notes');
+
+        $left = 80;
+        $radius = 95;
+        $cx = $left + $radius;
+        $cy = 300;
+        $hasAvatar = $profile->avatar_url !== null
+            && self::drawCircularAvatar($image, $profile->avatar_url, $cx, $cy, $radius);
+
+        $textLeft = $hasAvatar ? $cx + $radius + 44 : $left;
+        $textMaxWidth = self::WIDTH - 80 - $textLeft;
+
+        $nameY = 270;
+        foreach (self::wrapText($image, $profile->display_name, $serif, 54, $textMaxWidth, 2) as $line) {
+            imagefttext($image, 54, 0, $textLeft, $nameY, $ink, $serif, $line);
+            $nameY += 66;
+        }
+        imagefttext($image, 25, 0, $textLeft, $nameY + 8, $ink3, $sans, $profile->role_title);
+
+        if ($profile->quote) {
+            $qy = max($nameY + 60, $hasAvatar ? $cy + $radius + 50 : $nameY + 60);
+            foreach (self::wrapText($image, $profile->quote, $serifItalic, 28, self::WIDTH - 160, 2) as $line) {
+                imagefttext($image, 28, 0, $left, $qy, $ink2, $serifItalic, $line);
+                $qy += 40;
+            }
+        }
+
+        self::drawFooter($image, $mono, $ink3, $moss, $hairline, $left, 'field notes');
+
+        return self::toPng($image);
+    }
+
+    /** The /support page card: the KHQR image (if set) and the support blurb. */
+    public static function supportCard(PortfolioProfile $profile): string
+    {
+        if (! function_exists('imagecreatetruecolor')) {
+            throw new RuntimeException('The GD extension is not available in this PHP build.');
+        }
+
+        $serif = self::font([
+            '/usr/share/fonts/dejavu/DejaVuSerif-Bold.ttf',
+            '/usr/share/fonts/ttf-dejavu/DejaVuSerif-Bold.ttf',
+        ]);
+        $sans = self::font([
+            '/usr/share/fonts/dejavu/DejaVuSans.ttf',
+            '/usr/share/fonts/ttf-dejavu/DejaVuSans.ttf',
+        ]);
+        $mono = self::font([
+            '/usr/share/fonts/dejavu/DejaVuSansMono.ttf',
+            '/usr/share/fonts/ttf-dejavu/DejaVuSansMono.ttf',
+            $sans,
+        ]);
+
+        $image = imagecreatetruecolor(self::WIDTH, self::HEIGHT);
+        $surface = self::color($image, self::SURFACE);
+        $white = imagecolorallocate($image, 255, 255, 255);
+        $ink = self::color($image, self::INK);
+        $ink2 = self::color($image, self::INK_2);
+        $ink3 = self::color($image, self::INK_3);
+        $moss = self::color($image, self::MOSS);
+        $hairline = self::mix($image, self::SURFACE, self::MOSS, 0.28);
+
+        imagefill($image, 0, 0, $surface);
+        self::drawHorizon($image);
+        imagefttext($image, 40, 0, 80, 108, $ink, $serif, 'Field Notes');
+
+        $left = 80;
+        $qrSize = 300;
+        $qrBoxX = self::WIDTH - 80 - $qrSize - 32;
+        $qrBoxY = 190;
+        $hasQr = $profile->support_qr_url !== null
+            && self::drawBoxedImage($image, $profile->support_qr_url, $qrBoxX, $qrBoxY, $qrSize, $white);
+
+        $textMaxWidth = $hasQr ? ($qrBoxX - $left - 40) : (self::WIDTH - 160);
+
+        imagefttext($image, 58, 0, $left, 260, $ink, $serif, 'Support this work');
+
+        $caption = $profile->support_caption
+            ?: 'If this space has brought you peace or inspiration, a small tip means a lot.';
+        $capY = 320;
+        foreach (self::wrapText($image, $caption, $sans, 28, $textMaxWidth, 5) as $line) {
+            imagefttext($image, 28, 0, $left, $capY, $ink2, $sans, $line);
+            $capY += 40;
+        }
+
+        if ($hasQr) {
+            imagefttext($image, 20, 0, $qrBoxX, $qrBoxY + $qrSize + 32 + 26, $ink3, $mono, 'Scan to support');
+        }
+
+        self::drawFooter($image, $mono, $ink3, $moss, $hairline, $left, '/support');
+
+        return self::toPng($image);
     }
 
     /**
@@ -251,5 +382,116 @@ class CampaignOgImage
             (int) round($from[1] + ($to[1] - $from[1]) * $t),
             (int) round($from[2] + ($to[2] - $from[2]) * $t),
         );
+    }
+
+    /** The horizon gradient across the top ten pixel rows: moss -> gold -> fjord. */
+    private static function drawHorizon($image): void
+    {
+        for ($y = 0; $y < 10; $y++) {
+            for ($x = 0; $x < self::WIDTH; $x++) {
+                $t = $x / (self::WIDTH - 1);
+                imagesetpixel($image, $x, $y, $t < 0.52
+                    ? self::mix($image, self::MOSS, self::GOLD, $t / 0.52)
+                    : self::mix($image, self::GOLD, self::FJORD, ($t - 0.52) / 0.48));
+            }
+        }
+    }
+
+    /** The hairline + left/right footer line every card shares. */
+    private static function drawFooter($image, string $mono, int $ink3, int $moss, int $hairline, int $left, string $footerLeft): void
+    {
+        imagefilledrectangle($image, $left, 552, self::WIDTH - 80, 553, $hairline);
+        imagefttext($image, 22, 0, $left, 602, $ink3, $mono, $footerLeft);
+        $note = 'Made slowly, shared warmly.';
+        imagefttext($image, 22, 0, self::WIDTH - 80 - self::textWidth($image, $note, $mono, 22), 602, $moss, $mono, $note);
+    }
+
+    private static function toPng($image): string
+    {
+        ob_start();
+        imagepng($image);
+        $png = (string) ob_get_clean();
+        imagedestroy($image);
+
+        return $png;
+    }
+
+    /**
+     * Fetch a remote image (avatar/QR). Times out fast and never throws:
+     * a slow or dead URL degrades to no photo, never a broken card.
+     */
+    private static function fetchImage(string $url): ?\GdImage
+    {
+        $context = stream_context_create([
+            'http' => ['timeout' => 3],
+            'https' => ['timeout' => 3],
+        ]);
+
+        $data = @file_get_contents($url, false, $context);
+
+        if ($data === false || $data === '') {
+            return null;
+        }
+
+        $image = @imagecreatefromstring($data);
+
+        return $image instanceof \GdImage ? $image : null;
+    }
+
+    /** Fetch, centre-crop to a square, and mask into a circle at ($cx, $cy). */
+    private static function drawCircularAvatar($image, string $url, int $cx, int $cy, int $radius): bool
+    {
+        $src = self::fetchImage($url);
+
+        if ($src === null) {
+            return false;
+        }
+
+        $srcW = imagesx($src);
+        $srcH = imagesy($src);
+        $cropSize = min($srcW, $srcH);
+        $srcX = intdiv($srcW - $cropSize, 2);
+        $srcY = intdiv($srcH - $cropSize, 2);
+
+        $d = $radius * 2;
+        $circle = imagecreatetruecolor($d, $d);
+        imagesavealpha($circle, true);
+        $transparent = imagecolorallocatealpha($circle, 0, 0, 0, 127);
+        imagefill($circle, 0, 0, $transparent);
+        imagecopyresampled($circle, $src, 0, 0, $srcX, $srcY, $d, $d, $cropSize, $cropSize);
+
+        for ($y = 0; $y < $d; $y++) {
+            for ($x = 0; $x < $d; $x++) {
+                $dx = $x - $radius;
+                $dy = $y - $radius;
+
+                if ($dx * $dx + $dy * $dy > $radius * $radius) {
+                    imagesetpixel($circle, $x, $y, $transparent);
+                }
+            }
+        }
+
+        imagecopy($image, $circle, $cx - $radius, $cy - $radius, 0, 0, $d, $d);
+        imagedestroy($circle);
+        imagedestroy($src);
+
+        return true;
+    }
+
+    /** Fetch and draw into a white padded square (keeps a QR code scannable-looking). */
+    private static function drawBoxedImage($image, string $url, int $x, int $y, int $size, int $white): bool
+    {
+        $src = self::fetchImage($url);
+
+        if ($src === null) {
+            return false;
+        }
+
+        $pad = 16;
+        imagefilledrectangle($image, $x, $y, $x + $size + $pad * 2, $y + $size + $pad * 2, $white);
+        imagecopyresampled($image, $src, $x + $pad, $y + $pad, 0, 0, $size, $size, imagesx($src), imagesy($src));
+        imagedestroy($src);
+
+        return true;
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Campaign;
+use App\Models\PortfolioProfile;
 use App\Support\CampaignOgImage;
 use Illuminate\Http\Response;
 
@@ -11,14 +12,29 @@ use Illuminate\Http\Response;
  *
  * Preview crawlers (Facebook, Messenger, iMessage, Discord…) fetch these
  * with plain GET requests — no session, no auth — so nothing here reads an
- * identity. Cards are rendered on the fly and cached briefly downstream.
+ * identity beyond the single public owner profile. Cards are rendered on
+ * the fly and cached briefly downstream.
  */
 class SocialShareController extends Controller
 {
-    /** The site card — og:image for every page that is not a campaign. */
+    /** The site card — og:image for every page that is not a campaign or /support. */
     public function siteOgImage(): Response
     {
-        return $this->card(CampaignOgImage::siteCard());
+        $profile = PortfolioProfile::query()->orderBy('id')->first();
+
+        return $this->card($profile !== null
+            ? CampaignOgImage::profileCard($profile)
+            : CampaignOgImage::siteCard());
+    }
+
+    /** The /support page's own card — the KHQR image (if set) and the blurb. */
+    public function supportOgImage(): Response
+    {
+        $profile = PortfolioProfile::query()->orderBy('id')->first();
+
+        return $this->card($profile !== null
+            ? CampaignOgImage::supportCard($profile)
+            : CampaignOgImage::siteCard());
     }
 
     /**

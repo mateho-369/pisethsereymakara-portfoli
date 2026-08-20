@@ -8,8 +8,9 @@ import type { MediaItem } from '../types';
 import LoadingState from '../components/LoadingState';
 import MediaLightbox, { type LightboxItem } from '../components/MediaLightbox';
 import MediaThumbnail from '../components/MediaThumbnail';
+import CategoryPicker from '../components/CategoryPicker';
 import { api } from '../lib/api';
-import { useUpload } from '../lib/useUpload';
+import { useUpload, sizeLabel } from '../lib/useUpload';
 
 const filters = ['All', 'Photos', 'Videos', 'Favorites'] as const;
 const aspectClass: Record<string, string> = { portrait: 'aspect-[4/5]', landscape: 'aspect-[4/3]', square: 'aspect-square' };
@@ -24,8 +25,22 @@ export default function GalleryPage() {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [manage, setManage] = useState(false);
   const [form, setForm] = useState({ title: '', description: '', category: 'Field Notes' });
+  const [pickedFile, setPickedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState('');
+  const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const previewRef = useRef('');
   const { uploadMedia, uploading, progress } = useUpload('media');
+
+  // Keep the quick-manage tile's preview in sync with the chosen file.
+  const pickFile = (file: File | null) => {
+    if (previewRef.current) URL.revokeObjectURL(previewRef.current);
+    previewRef.current = file && file.type.startsWith('image/') ? URL.createObjectURL(file) : '';
+    setPreviewUrl(previewRef.current);
+    setPickedFile(file);
+  };
+
+  useEffect(() => () => { if (previewRef.current) URL.revokeObjectURL(previewRef.current); }, []);
 
   const fetchMedia = useCallback(async () => {
     setError('');
@@ -54,13 +69,13 @@ export default function GalleryPage() {
   })), [filtered]);
 
   const upload = async () => {
-    const file = fileRef.current?.files?.[0];
-    if (!file || !form.title.trim()) return setError('Add a title and choose an image or video first.');
+    if (!pickedFile || !form.title.trim()) return setError('Add a title and choose an image or video first.');
     setError('');
     try {
-      const uploaded = await uploadMedia(file);
-      await api.media.create({ ...form, media_type: uploaded.isVideo ? 'video' : 'photo', thumbnail_url: uploaded.thumbnailUrl, media_url: uploaded.url, size_label: uploaded.sizeLabel, aspect_ratio: 'landscape', captured_at: new Date().toISOString(), is_favorite: false, is_public: true });
+      const uploaded = await uploadMedia(pickedFile);
+      await api.media.create({ ...form, category: form.category.trim() || 'Field Notes', media_type: uploaded.isVideo ? 'video' : 'photo', thumbnail_url: uploaded.thumbnailUrl, media_url: uploaded.url, size_label: uploaded.sizeLabel, aspect_ratio: 'landscape', captured_at: new Date().toISOString(), is_favorite: false, is_public: true });
       setForm({ title: '', description: '', category: 'Field Notes' });
+      pickFile(null);
       if (fileRef.current) fileRef.current.value = '';
       await fetchMedia();
       if (uploaded.posterMissing) setError('The video was added, but its cover could not be generated. Use Full studio to upload a cover image.');
@@ -105,18 +120,44 @@ export default function GalleryPage() {
       {manage && isAdmin && (
         <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-14 rounded-[1.5rem] p-5 sm:p-7" style={{ background: 'var(--bg-surface)', boxShadow: 'var(--shadow-md)' }}>
           <div className="grid gap-5 lg:grid-cols-[1fr_1fr]">
-            <button onClick={() => fileRef.current?.click()} className="group flex min-h-48 flex-col items-center justify-center rounded-2xl border border-dashed p-7 text-center transition" style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}>
-              <span className="grid h-12 w-12 place-items-center rounded-full" style={{ background: 'var(--gold-pale)', color: 'var(--gold-deep)' }}><UploadCloud size={22} /></span>
-              <strong className="mt-4 font-serif text-xl" style={{ color: 'var(--ink)' }}>Drop a file into the journal</strong>
-              <span className="mt-2 text-sm" style={{ color: 'var(--ink-3)' }}>Click to choose · Images or video · 4 MB max</span>
-            </button>
+            <div className="space-y-3">
+              <button
+                onClick={() => fileRef.current?.click()}
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={(e) => { e.preventDefault(); setDragOver(false); pickFile(e.dataTransfer.files?.[0] ?? null); }}
+                className="group flex w-full flex-col items-center justify-center rounded-2xl border border-dashed p-7 text-center transition"
+                style={{ borderColor: dragOver ? 'var(--moss)' : 'var(--border)', background: 'var(--bg)', minHeight: pickedFile ? 'auto' : '12rem' }}
+              >
+                {pickedFile ? (
+                  <>
+                    <span className="flex items-center gap-3 text-left">
+                      {previewUrl ? (
+                        <img src={previewUrl} alt="" className="h-14 w-14 rounded-lg object-cover" />
+                      ) : (
+                        <span className="grid h-14 w-14 place-items-center rounded-lg" style={{ background: 'var(--gold-pale)', color: 'var(--gold-deep)' }}><Video size={22} /></span>
+                      )}
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium" style={{ color: 'var(--ink)' }}>{pickedFile.name}</span>
+                        <span className="mt-1 block font-mono text-[9px] uppercase tracking-wider" style={{ color: 'var(--ink-3)' }}>{pickedFile.type || 'file'} · {sizeLabel(pickedFile.size)}</span>
+                      </span>
+                    </span>
+                    <span className="mt-3 text-xs underline decoration-dotted underline-offset-4" style={{ color: 'var(--ink-3)' }}>Click to choose a different file</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="grid h-12 w-12 place-items-center rounded-full" style={{ background: 'var(--gold-pale)', color: 'var(--gold-deep)' }}><UploadCloud size={22} /></span>
+                    <strong className="mt-4 font-serif text-xl" style={{ color: 'var(--ink)' }}>Drop a file into the journal</strong>
+                    <span className="mt-2 text-sm" style={{ color: 'var(--ink-3)' }}>Drag & drop or click · Images or video · 4 MB max</span>
+                  </>
+                )}
+              </button>
+              <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden" onChange={(e) => { pickFile(e.target.files?.[0] ?? null); }} />
+            </div>
             <div className="space-y-4">
-              <input ref={fileRef} type="file" accept="image/*,video/*" className="input-field file:mr-4 file:rounded-full file:border-0 file:px-4 file:py-2 file:text-sm" style={{ '--file-bg': 'rgba(110,124,82,.1)', '--file-color': 'var(--moss)' } as React.CSSProperties} />
               <input className="input-field" placeholder="A gentle title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-              <div className="grid gap-4 sm:grid-cols-2">
-                <input className="input-field" placeholder="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
-                <input className="input-field" placeholder="A short caption" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-              </div>
+              <CategoryPicker value={form.category} onChange={(category) => setForm({ ...form, category })} />
+              <input className="input-field" placeholder="A short caption" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
               <button onClick={upload} disabled={uploading} className="btn-primary w-full justify-center disabled:cursor-wait disabled:opacity-60">
                 {uploading ? <><LoaderCircle className="animate-spin" size={17} /> Curating… {progress}%</> : <><UploadCloud size={17} /> Add to gallery</>}
               </button>

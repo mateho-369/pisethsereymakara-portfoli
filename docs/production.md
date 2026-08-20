@@ -1,5 +1,5 @@
-# Production Deployment Guide
-
+i# Production Deployment Guide
+	
 This guide deploys the Field Notes stack on a single Linux VM (GCP e2-micro or equivalent). The frontend is served separately by a Cloudflare Worker. There is **no WebSocket service** — the chat uses polling.
 
 ## Prerequisites
@@ -61,8 +61,11 @@ DB_PORT=<aiven-port>
 DB_DATABASE=defaultdb
 DB_USERNAME=avnadmin
 DB_PASSWORD=<aiven-password>
-# Download Aiven CA cert and set path here (optional but recommended)
-# DB_SSL_CA=/home/<you>/aiven-ca.pem
+# REQUIRED - Aiven enforces TLS. Download the CA cert from the Aiven
+# console (Service -> Overview -> "CA Certificate"), save it to
+# backend/storage/app/aiven-ca.pem on the VM (this path sits inside the
+# Docker build context, so it gets baked into the image on the next build):
+DB_SSL_CA=/var/www/html/storage/app/aiven-ca.pem
 
 SESSION_SECURE_COOKIE=true
 SESSION_SAME_SITE=none
@@ -83,6 +86,13 @@ GOOGLE_CLIENT_ID=<from Google Cloud Console>
 GOOGLE_CLIENT_SECRET=<from Google Cloud Console>
 GOOGLE_REDIRECT_URI=https://api.yourdomain.com/api/auth/google/callback
 ```
+
+### Also create a root .env file
+
+docker-compose.prod.yml resolves AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY
+for MinIO's root user at the project root (not from backend/.env). Copy
+the project root .env.example to .env and paste in the SAME two values
+you just put in backend/.env.
 
 ## Step 4 — Start the production stack
 

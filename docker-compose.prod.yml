@@ -56,12 +56,13 @@ services:
       minio:
         condition: service_healthy
     entrypoint: ["/bin/sh", "-c"]
-    command: >-
-      mc alias set local http://minio:9000 "$${AWS_ACCESS_KEY_ID}" "$${AWS_SECRET_ACCESS_KEY}" &&
-      mc mb --ignore-existing local/portfolio &&
-      mc anonymous set download local/portfolio/media &&
-      mc anonymous set download local/portfolio/chat &&
-      mc anonymous set none local/portfolio/campaigns
+    command:
+      - >-
+        mc alias set local http://minio:9000 "$${AWS_ACCESS_KEY_ID}" "$${AWS_SECRET_ACCESS_KEY}" &&
+        mc mb --ignore-existing local/portfolio &&
+        mc anonymous set download local/portfolio/media &&
+        mc anonymous set download local/portfolio/chat &&
+        mc anonymous set none local/portfolio/campaigns
 
 volumes:
   minio-data:

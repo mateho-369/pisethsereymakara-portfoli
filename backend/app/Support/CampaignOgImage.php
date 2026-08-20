@@ -87,7 +87,7 @@ class CampaignOgImage
         }
 
         // Brand wordmark, top left.
-        imagefttext(40, 0, 80, 108, $ink, $serif, 'Field Notes');
+        imagefttext($image, 40, 0, 80, 108, $ink, $serif, 'Field Notes');
 
         // Type eyebrow, top right — mirrors the campaign page's own copy.
         if ($campaign !== null) {
@@ -97,7 +97,7 @@ class CampaignOgImage
                 default => 'Send a photo',
             };
             $eyebrow = mb_strtoupper($eyebrow);
-            imagefttext(22, 0, self::WIDTH - 80 - self::textWidth($image, $eyebrow, $mono, 22), 100, $ink3, $mono, $eyebrow);
+            imagefttext($image, 22, 0, self::WIDTH - 80 - self::textWidth($image, $eyebrow, $mono, 22), 100, $ink3, $mono, $eyebrow);
         }
 
         $left = 80;
@@ -112,27 +112,27 @@ class CampaignOgImage
             $titleY = $promptLines === [] ? 320 : 250;
 
             foreach (self::wrapText($image, $campaign->title, $serif, 66, $maxWidth, 2) as $line) {
-                imagefttext(66, 0, $left, $titleY, $ink, $serif, $line);
+                imagefttext($image, 66, 0, $left, $titleY, $ink, $serif, $line);
                 $titleY += 84;
             }
 
             $promptY = $titleY + 16;
             foreach ($promptLines as $line) {
-                imagefttext(30, 0, $left, $promptY, $ink2, $sans, $line);
+                imagefttext($image, 30, 0, $left, $promptY, $ink2, $sans, $line);
                 $promptY += 46;
             }
         } else {
             // Site card: the site's own eyebrow copy as the centrepiece.
-            imagefttext(72, 0, $left, 300, $ink, $serifItalic, 'A quiet corner of the internet.');
-            imagefttext(30, 0, $left, 380, $ink3, $sans, 'Piseth Serey Makara · Field Notes');
+            imagefttext($image, 72, 0, $left, 300, $ink, $serifItalic, 'A quiet corner of the internet.');
+            imagefttext($image, 30, 0, $left, 380, $ink3, $sans, 'Piseth Serey Makara · Field Notes');
         }
 
         // Footer hairline and line: where to find it, and the house note.
         imagefilledrectangle($image, $left, 552, self::WIDTH - 80, 553, $hairline);
         $footerLeft = $campaign !== null ? '/ask/'.$campaign->slug : 'field notes';
-        imagefttext(22, 0, $left, 602, $ink3, $mono, $footerLeft);
+        imagefttext($image, 22, 0, $left, 602, $ink3, $mono, $footerLeft);
         $note = 'Made slowly, shared warmly.';
-        imagefttext(22, 0, self::WIDTH - 80 - self::textWidth($image, $note, $mono, 22), 602, $moss, $mono, $note);
+        imagefttext($image, 22, 0, self::WIDTH - 80 - self::textWidth($image, $note, $mono, 22), 602, $moss, $mono, $note);
 
         ob_start();
         imagepng($image);

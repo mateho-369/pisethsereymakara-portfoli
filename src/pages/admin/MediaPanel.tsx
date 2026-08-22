@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, Eye, EyeOff, LoaderCircle, Pencil, Star, Trash2, UploadCloud } from 'lucide-react';
+import { ArrowDown, ArrowUp, CheckSquare, Eye, EyeOff, LoaderCircle, Pencil, Square, Star, Trash2, UploadCloud, X } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useResource } from '../../lib/useResource';
 import { useUpload } from '../../lib/useUpload';
@@ -37,6 +37,13 @@ export default function MediaPanel() {
   const [editing, setEditing] = useState<MediaItem | null>(null);
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState<MediaItem | null>(null);
+
+  // Bulk select: off by default so the everyday single-item flow (favorite,
+  // visibility, edit, single delete) never changes for anyone not using it.
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [confirmingBulkDelete, setConfirmingBulkDelete] = useState(false);
 
   if (loading) return <LoadingState label="Developing the photographs…" />;
   if (error) return <div className="admin-card" style={{ color: 'var(--gold-deep)' }}>{error}</div>;
@@ -126,13 +133,84 @@ export default function MediaPanel() {
     catch (err) { toastError(err instanceof Error ? err.message : 'Could not remove this piece.'); }
   };
 
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelected(new Set());
+  };
+
+  const toggleSelected = (id: number) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const allSelected = items.length > 0 && selected.size === items.length;
+  const toggleSelectAll = () => setSelected(allSelected ? new Set() : new Set(items.map((item) => item.id)));
+
+  const bulkDelete = async () => {
+    const ids = [...selected];
+    setBulkDeleting(true);
+    try {
+      const results = await Promise.allSettled(ids.map((id) => api.media.remove(id)));
+      const failed = results.filter((r) => r.status === 'rejected').length;
+      await reload();
+      exitSelectMode();
+      if (failed > 0) {
+        toastError(`Removed ${ids.length - failed} of ${ids.length} — ${failed} could not be deleted.`);
+      } else {
+        success(`Removed ${ids.length} ${ids.length === 1 ? 'piece' : 'pieces'} from the gallery.`);
+      }
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-5">
       <PostComposer onPublished={reload} suggestions={categorySuggestions} />
 
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {!selectMode ? (
+          <button onClick={() => setSelectMode(true)} className="btn-outline !py-2" disabled={items.length === 0}>
+            <CheckSquare size={15} /> Select
+          </button>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            <button onClick={toggleSelectAll} className="btn-outline !py-2">
+              {allSelected ? <Square size={15} /> : <CheckSquare size={15} />} {allSelected ? 'Deselect all' : 'Select all'}
+            </button>
+            <span className="font-mono text-[11px] uppercase tracking-[.1em]" style={{ color: 'var(--ink-3)' }}>
+              {selected.size} selected
+            </span>
+            <button
+              onClick={() => setConfirmingBulkDelete(true)}
+              disabled={selected.size === 0 || bulkDeleting}
+              className="btn-primary !py-2 disabled:opacity-50"
+              style={{ background: '#A4523C', boxShadow: '0 8px 22px rgba(164,82,60,.22)' }}
+            >
+              {bulkDeleting ? <LoaderCircle className="animate-spin" size={15} /> : <Trash2 size={15} />} Delete selected
+            </button>
+            <button onClick={exitSelectMode} disabled={bulkDeleting} className="icon-button" aria-label="Cancel selecting">
+              <X size={16} />
+            </button>
+          </div>
+        )}
+      </div>
+
       <section className="admin-card">
         {items.map((item, index) => (
           <div key={item.id} className="admin-row md:grid-cols-[auto_1fr_auto] md:items-center">
+            {selectMode && (
+              <button
+                onClick={() => toggleSelected(item.id)}
+                className="icon-button"
+                aria-label={selected.has(item.id) ? 'Deselect' : 'Select'}
+              >
+                {selected.has(item.id) ? <CheckSquare size={18} /> : <Square size={18} />}
+              </button>
+            )}
             <MediaThumbnail url={item.thumbnail_url} alt="" className="h-16 w-20 rounded-lg object-cover" />
             <div className="min-w-0">
               <p className="font-medium" style={{ color: 'var(--ink)' }}>{item.title}</p>
@@ -140,20 +218,22 @@ export default function MediaPanel() {
                 {item.category} · {item.media_type} · {item.size_label} · {new Date(item.captured_at).toLocaleDateString()}
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-1">
-              <button onClick={() => move(index, -1)} disabled={index === 0} className="icon-button disabled:opacity-30" aria-label="Move up"><ArrowUp size={16} /></button>
-              <button onClick={() => move(index, 1)} disabled={index === items.length - 1} className="icon-button disabled:opacity-30" aria-label="Move down"><ArrowDown size={16} /></button>
-              <button onClick={() => patch(item, { is_favorite: !item.is_favorite })} className="icon-button" style={item.is_favorite ? { color: 'var(--gold-deep)' } : {}} aria-label="Toggle favorite">
-                <Star size={16} fill={item.is_favorite ? 'currentColor' : 'none'} />
-              </button>
-              <button onClick={() => patch(item, { is_public: !item.is_public })} className="icon-button" aria-label="Toggle visibility">
-                {item.is_public ? <Eye size={16} /> : <EyeOff size={16} />}
-              </button>
-              <button onClick={() => setEditing(item)} className="icon-button" aria-label="Edit"><Pencil size={16} /></button>
-              <KebabMenu actions={[
-                { label: 'Delete from gallery', icon: <Trash2 size={15} />, danger: true, onClick: () => setRemoving(item) },
-              ]} />
-            </div>
+            {!selectMode && (
+              <div className="flex flex-wrap items-center gap-1">
+                <button onClick={() => move(index, -1)} disabled={index === 0} className="icon-button disabled:opacity-30" aria-label="Move up"><ArrowUp size={16} /></button>
+                <button onClick={() => move(index, 1)} disabled={index === items.length - 1} className="icon-button disabled:opacity-30" aria-label="Move down"><ArrowDown size={16} /></button>
+                <button onClick={() => patch(item, { is_favorite: !item.is_favorite })} className="icon-button" style={item.is_favorite ? { color: 'var(--gold-deep)' } : {}} aria-label="Toggle favorite">
+                  <Star size={16} fill={item.is_favorite ? 'currentColor' : 'none'} />
+                </button>
+                <button onClick={() => patch(item, { is_public: !item.is_public })} className="icon-button" aria-label="Toggle visibility">
+                  {item.is_public ? <Eye size={16} /> : <EyeOff size={16} />}
+                </button>
+                <button onClick={() => setEditing(item)} className="icon-button" aria-label="Edit"><Pencil size={16} /></button>
+                <KebabMenu actions={[
+                  { label: 'Delete from gallery', icon: <Trash2 size={15} />, danger: true, onClick: () => setRemoving(item) },
+                ]} />
+              </div>
+            )}
           </div>
         ))}
         {items.length === 0 && <p className="py-8 text-center text-sm" style={{ color: 'var(--ink-4)' }}>The gallery is empty.</p>}
@@ -212,6 +292,16 @@ export default function MediaPanel() {
         tone="destructive"
         onConfirm={async () => { if (removing) await remove(removing); }}
         onClose={() => setRemoving(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmingBulkDelete}
+        title={`Remove ${selected.size} ${selected.size === 1 ? 'piece' : 'pieces'}?`}
+        description="Each selected photo or video, and its stored file, will be deleted for good."
+        confirmLabel="Delete selected"
+        tone="destructive"
+        onConfirm={bulkDelete}
+        onClose={() => setConfirmingBulkDelete(false)}
       />
     </div>
   );

@@ -167,7 +167,24 @@ export const api = {
     file: async (file: File, kind: 'media' | 'chat') => {
       const path = kind === 'media' ? '/api/admin/uploads/presign' : '/api/uploads/presign';
       const signed = await request<PresignResponse>(path, { method: 'POST', body: { file_name: file.name, content_type: file.type || 'application/octet-stream', size: file.size } });
-      const upload = await fetch(signed.upload_url, { method: 'PUT', headers: signed.headers, body: file });
+
+      // This PUT goes straight to storage, bypassing our own API -- with no
+      // timeout, a stalled connection hung forever with zero feedback, even
+      // though the file had often already finished uploading server-side.
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 45000);
+      let upload: Response;
+      try {
+        upload = await fetch(signed.upload_url, { method: 'PUT', headers: signed.headers, body: file, signal: controller.signal });
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          throw new Error('The upload timed out. It may have still finished -- check the gallery in a moment before retrying.');
+        }
+        throw error;
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+
       if (!upload.ok) throw new Error('The file could not be uploaded to media storage.');
       return { url: signed.public_url as string, key: signed.key };
     },

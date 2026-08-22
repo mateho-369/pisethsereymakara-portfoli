@@ -1,0 +1,78 @@
+# Single-container image for platforms that run ONE container per service
+# (Koyeb, Render, Railway, Fly.io, ...): nginx + php-fpm are supervised
+# together by supervisord inside a single process.
+#
+# This is intentionally a separate file from docker/php/Dockerfile, which the
+# VM deployment (docker-compose.prod.yml) still uses with a standalone nginx
+# container. Keep both working until the VM stack is fully decommissioned.
+#
+# Build (context = backend/):
+#   docker build -f docker/php/Dockerfile.koyeb -t field-notes-api .
+# Run locally:
+#   docker run --rm -p 8000:8000 -e PORT=8000 -e APP_ENV=local field-notes-api
+
+FROM alpine:3.20
+
+# 1. Ensure the www-data user exists (used by php-fpm).
+RUN adduser -u 82 -D -S -G www-data www-data 2>/dev/null || true
+
+# 2. Install pre-compiled PHP 8.3 & extensions, plus nginx + supervisord +
+#    envsubst for single-container operation.
+RUN apk add --no-cache \
+    bash \
+    curl \
+    git \
+    ttf-dejavu \
+    php83 \
+    php83-fpm \
+    php83-bcmath \
+    php83-ctype \
+    php83-curl \
+    php83-dom \
+    php83-fileinfo \
+    php83-gd \
+    php83-intl \
+    php83-mbstring \
+    php83-openssl \
+    php83-pcntl \
+    php83-pdo_mysql \
+    php83-phar \
+    php83-session \
+    php83-simplexml \
+    php83-tokenizer \
+    php83-xml \
+    php83-xmlwriter \
+    php83-zip \
+    composer \
+    nginx \
+    supervisor \
+    gettext-envsubst \
+    && ln -sf /usr/bin/php83 /usr/bin/php \
+    && sed -i 's/user = nobody/user = www-data/' /etc/php83/php-fpm.d/www.conf \
+    && sed -i 's/group = nobody/group = www-data/' /etc/php83/php-fpm.d/www.conf \
+    && rm -f /etc/nginx/http.d/default.conf
+
+WORKDIR /var/www/html
+COPY composer.json ./
+RUN composer install --no-interaction --no-dev --no-scripts --prefer-dist --no-progress
+COPY . .
+RUN composer install --no-interaction --no-dev --optimize-autoloader --no-progress \
+    && chown -R www-data:www-data storage bootstrap/cache
+
+# nginx site template: ${PORT} is rendered by the entrypoint at container start.
+COPY docker/nginx/default.conf.template /etc/nginx/http.d/default.conf.template
+
+# supervisord config that runs php-fpm and nginx in this container.
+COPY docker/php/supervisord.conf /etc/supervisord.conf
+
+# Entrypoint: prepares Laravel, renders the nginx config from $PORT, then
+# starts supervisord (php-fpm + nginx) in the foreground.
+COPY docker/php/entrypoint.koyeb.sh /usr/local/bin/field-notes-entrypoint
+RUN chmod +x /usr/local/bin/field-notes-entrypoint \
+    && echo "clear_env = no" >> /etc/php83/php-fpm.d/www.conf
+
+# The container listens on the port the platform injects (default 8000).
+EXPOSE 8000
+
+ENTRYPOINT ["field-notes-entrypoint"]
+CMD ["supervisord", "-c", "/etc/supervisord.conf", "-n"]

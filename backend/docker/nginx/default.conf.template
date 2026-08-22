@@ -1,0 +1,21 @@
+server {
+    # The entrypoint renders this template at container start via envsubst,
+    # substituting only the PORT variable. Single-container platforms (Koyeb,
+    # Render, Railway) inject PORT dynamically (typically 8000).
+    listen ${PORT};
+    server_name _;
+    root /var/www/html/public;
+    index index.php;
+    client_max_body_size 8m;
+
+    location / { try_files $uri $uri/ /index.php?$query_string; }
+    location ~ \.php$ {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param HTTP_PROXY "";
+        # php-fpm runs in the same container, so talk to it over loopback.
+        fastcgi_pass 127.0.0.1:9000;
+        fastcgi_read_timeout 60s;
+    }
+    location ~ /\. { deny all; }
+}
